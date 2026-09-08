@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tablero de Control - Análisis de Aceite</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Librerías de Gráficos (Chart.js + Plugin de Boxplot) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.3.0/build/index.umd.min.js"></script>
+    
+    <!-- PapaParse para leer CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-gray-100 p-4 md:p-6 font-sans text-gray-800">
@@ -24,17 +29,26 @@
         </div>
 
         <!-- Barra de Filtros -->
-        <div id="filtrosContainer" class="hidden flex-wrap gap-6 mb-8 bg-gray-50 p-5 rounded-md border border-gray-200 shadow-sm">
-            <div class="flex flex-col w-48">
+        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-8 bg-gray-50 p-5 rounded-md border border-gray-200 shadow-sm">
+            
+            <div class="flex flex-col w-40">
                 <label for="flotaFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Flota</label>
                 <select id="flotaFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todas">Todas</option>
                 </select>
             </div>
 
-            <div class="flex flex-col w-48">
+            <div class="flex flex-col w-40">
                 <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo</label>
                 <select id="equipoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
+
+            <!-- NUEVO: Filtro Codex -->
+            <div class="flex flex-col w-40">
+                <label for="codexFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Filtro Codex</label>
+                <select id="codexFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
                 </select>
             </div>
@@ -49,7 +63,7 @@
             </div>
         </div>
 
-        <!-- Contenedor de los 4 Gráficos (Grid 2x2) -->
+        <!-- Contenedor de Gráficos -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             <!-- Gráfico 1: Desgaste -->
@@ -76,19 +90,19 @@
                 <div class="relative w-full h-72"><canvas id="cilindrosChart"></canvas></div>
             </div>
 
+            <!-- NUEVO Gráfico 5: Boxplot de Horas (Ocupa todo el ancho en pantallas grandes) -->
+            <div class="border rounded-lg p-4 bg-white shadow-sm col-span-1 lg:col-span-2">
+                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Distribución de Horas de Componentes (Boxplot)</h3>
+                <div class="relative w-full h-80"><canvas id="boxplotChart"></canvas></div>
+            </div>
+
         </div>
     </div>
 
     <script>
-        // Variables globales para almacenar los datos de los 3 archivos
-        let dataTrakka = [];
-        let dataComponentes = [];
-        let dataConsumo = [];
-        
-        // Variables para las instancias de Chart.js
-        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null };
+        let dataTrakka = [], dataComponentes = [], dataConsumo = [];
+        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null };
 
-        // Función auxiliar para leer CSV como Promesa
         function fetchCSV(url) {
             return new Promise((resolve, reject) => {
                 Papa.parse(url, {
@@ -99,16 +113,13 @@
             });
         }
 
-        // 1. Cargar todos los archivos al iniciar
         window.onload = function() {
             Promise.all([
                 fetchCSV('Data_aceites_ANALISIS_DE_ACEITE_TRAKKA.csv'),
                 fetchCSV('Data_aceites_BD_COMPONENTES_REMOVIDOS.csv'),
                 fetchCSV('Data_aceites_CONSUMO_DE_ACEITE.csv')
             ]).then(([trakka, componentes, consumo]) => {
-                dataTrakka = trakka;
-                dataComponentes = componentes;
-                dataConsumo = consumo;
+                dataTrakka = trakka; dataComponentes = componentes; dataConsumo = consumo;
                 
                 document.getElementById('estadoCarga').textContent = "Datos cargados correctamente ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-green-600 bg-green-50 p-2 rounded";
@@ -118,48 +129,55 @@
                 inicializarFiltros();
                 procesarYDibujarTodo();
             }).catch(err => {
-                document.getElementById('estadoCarga').textContent = "Error al cargar CSVs. Verifica que estén en GitHub.";
+                document.getElementById('estadoCarga').textContent = "Error al cargar CSVs.";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-red-600 bg-red-50 p-2 rounded";
             });
         };
 
-        // Extraer filtros (Flotas y Equipos basados principalmente en Trakka)
         function inicializarFiltros() {
-            const flotas = new Set();
-            const equipos = new Set();
+            const flotas = new Set(), equipos = new Set(), codexSet = new Set();
+            
             dataTrakka.forEach(row => {
                 if (row['Flota']) flotas.add(row['Flota'].trim());
                 if (row['Equipo']) equipos.add(row['Equipo'].trim());
             });
 
+            dataComponentes.forEach(row => {
+                if (row['Codex']) codexSet.add(row['Codex'].trim());
+            });
+
             const flotaSelect = document.getElementById('flotaFilter');
             const equipoSelect = document.getElementById('equipoFilter');
+            const codexSelect = document.getElementById('codexFilter');
             
             Array.from(flotas).sort().forEach(f => flotaSelect.appendChild(new Option(f, f)));
             Array.from(equipos).sort().forEach(e => equipoSelect.appendChild(new Option(e, e)));
+            
+            // Llenar filtro Codex y seleccionar "HCO" por defecto si existe
+            Array.from(codexSet).sort().forEach(c => {
+                const opt = new Option(c, c);
+                if (c === 'HCO') opt.selected = true; // Aplica HCO por defecto
+                codexSelect.appendChild(opt);
+            });
         }
 
-        // Utilidad: Parsear números con coma
         const num = str => parseFloat((str||'').toString().replace(',', '.')) || 0;
 
-        // Utilidad: Estandarizar fechas (maneja formato texto o número serial de Excel)
         function parseFecha(fechaStr) {
             if (!fechaStr) return null;
             let f = fechaStr.toString().trim();
             if (!isNaN(f)) { 
-                // Es un número de serie de Excel (Ej. 46261)
                 const date = new Date((parseInt(f) - 25569) * 86400 * 1000);
                 return { año: date.getUTCFullYear().toString(), mes: (date.getUTCMonth() + 1).toString().padStart(2, '0') };
             }
             const partes = f.split(/[-/ T]/);
             if (partes.length >= 3) {
                 if (partes[0].length === 4) return { año: partes[0], mes: partes[1].padStart(2, '0') };
-                else return { año: partes[2].substring(0,4), mes: partes[1].padStart(2, '0') }; // DD/MM/YYYY
+                else return { año: partes[2].substring(0,4), mes: partes[1].padStart(2, '0') };
             }
             return null;
         }
 
-        // Obtener la clave del Eje X
         function getXKey(fechaStr, dimension) {
             const parsed = parseFecha(fechaStr);
             if (!parsed) return null;
@@ -168,13 +186,13 @@
             return `${parsed.año}-${parsed.mes}`;
         }
 
-        // Función principal que actualiza los 4 gráficos
         function procesarYDibujarTodo() {
             const flotaSel = document.getElementById('flotaFilter').value;
             const equipoSel = document.getElementById('equipoFilter').value;
+            const codexSel = document.getElementById('codexFilter').value;
             const dimTiempo = document.getElementById('timeDimension').value;
 
-            // --- PROCESAR TRAKKA (Desgaste e ISO) ---
+            // TRAKKA
             const statsTrakka = {};
             dataTrakka.forEach(d => {
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
@@ -195,23 +213,31 @@
                 statsTrakka[xKey].count++;
             });
 
-            // --- PROCESAR COMPONENTES (Cilindros y Bombas) ---
+            // COMPONENTES (Cilindros/Bombas y Boxplot de Horas)
             const statsComponentes = {};
             dataComponentes.forEach(d => {
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return;
                 if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
-
-                const tipo = (d['Tipo De Componente'] || '').toUpperCase();
-                if (!tipo.includes('CILINDRO') && !tipo.includes('BOMBA')) return; // Solo Cilindros y Bombas
+                if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return; // Se aplica filtro Codex
 
                 const xKey = getXKey(d['Fecha Calculada'] || d['Fecha'], dimTiempo);
                 if (!xKey) return;
 
-                if (!statsComponentes[xKey]) statsComponentes[xKey] = 0;
-                statsComponentes[xKey]++; // Contar reemplazos
+                if (!statsComponentes[xKey]) statsComponentes[xKey] = { cilindrosCount: 0, horas: [] };
+                
+                const tipo = (d['Tipo De Componente'] || '').toUpperCase();
+                if (tipo.includes('CILINDRO') || tipo.includes('BOMBA')) {
+                    statsComponentes[xKey].cilindrosCount++;
+                }
+
+                // Extraer horas para el Boxplot
+                const horas = num(d['Horas del Comp. en la posición']);
+                if (horas > 0) {
+                    statsComponentes[xKey].horas.push(horas);
+                }
             });
 
-            // --- PROCESAR CONSUMO ---
+            // CONSUMO
             const statsConsumo = {};
             dataConsumo.forEach(d => {
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
@@ -221,17 +247,16 @@
                 if (!xKey) return;
 
                 if (!statsConsumo[xKey]) statsConsumo[xKey] = 0;
-                statsConsumo[xKey] += num(d['Despachado'] || d['Valor']); // Asumiendo columna de cantidad
+                statsConsumo[xKey] += num(d['Despachado'] || d['Valor']);
             });
 
-            // --- UNIFICAR ETIQUETAS (Eje X) ---
+            // UNIFICAR ETIQUETAS
             const todasLasEtiquetas = new Set([...Object.keys(statsTrakka), ...Object.keys(statsComponentes), ...Object.keys(statsConsumo)]);
             const labels = Array.from(todasLasEtiquetas).sort();
 
-            // Preparar arrays para Chart.js
             const dHierro = [], dCobre = [], dPlomo = [], dCromo = [], dAlum = [];
             const dIso4 = [], dIso6 = [], dIso14 = [];
-            const dCilindros = [], dConsumo = [];
+            const dCilindros = [], dConsumo = [], dBoxplot = [];
 
             labels.forEach(l => {
                 const tk = statsTrakka[l];
@@ -243,15 +268,18 @@
                     dHierro.push(0); dCobre.push(0); dPlomo.push(0); dCromo.push(0); dAlum.push(0);
                     dIso4.push(0); dIso6.push(0); dIso14.push(0);
                 }
-                dCilindros.push(statsComponentes[l] || 0);
+                
+                const comp = statsComponentes[l];
+                dCilindros.push(comp ? comp.cilindrosCount : 0);
+                dBoxplot.push(comp && comp.horas.length > 0 ? comp.horas : []); // Arreglo de horas
+                
                 dConsumo.push(statsConsumo[l] || 0);
             });
 
-            dibujarGraficos(labels, {dHierro, dCobre, dPlomo, dCromo, dAlum}, {dIso4, dIso6, dIso14}, dCilindros, dConsumo);
+            dibujarGraficos(labels, {dHierro, dCobre, dPlomo, dCromo, dAlum}, {dIso4, dIso6, dIso14}, dCilindros, dConsumo, dBoxplot);
         }
 
-        // Crear/Actualizar instancias de Chart.js
-        function dibujarGraficos(labels, tk, iso, cilindros, consumo) {
+        function dibujarGraficos(labels, tk, iso, cilindros, consumo, boxplotData) {
             const chartOpts = { responsive: true, maintainAspectRatio: false };
             
             // 1. Desgaste
@@ -293,11 +321,34 @@
                     { label: 'Cant. Componentes Removidos', data: cilindros, backgroundColor: '#f97316' }
                 ]}, options: chartOpts
             });
+
+            // 5. Boxplot (NUEVO)
+            if (charts.boxplot) charts.boxplot.destroy();
+            charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
+                type: 'boxplot',
+                data: { labels: labels, datasets: [
+                    { 
+                        label: 'Horas del Componente', 
+                        data: boxplotData, 
+                        backgroundColor: 'rgba(16, 185, 129, 0.4)', 
+                        borderColor: '#10b981', 
+                        borderWidth: 1, 
+                        outlierColor: '#ef4444' 
+                    }
+                ]}, 
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
         }
 
-        // Eventos de Filtros
         document.getElementById('flotaFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('equipoFilter').addEventListener('change', procesarYDibujarTodo);
+        document.getElementById('codexFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('timeDimension').addEventListener('change', procesarYDibujarTodo);
     </script>
 </body>
