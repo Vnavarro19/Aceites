@@ -37,10 +37,11 @@
 
         <!-- Barra de Filtros -->
         <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
+            <!-- FILTRO DE AÑO MÚLTIPLE -->
             <div class="flex flex-col w-32">
-                <label for="yearFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Año</label>
-                <select id="yearFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="Todos">Todos</option>
+                <label for="yearFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Año (Ctrl+Click)</label>
+                <select id="yearFilter" multiple size="3" class="border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-y-auto">
+                    <option value="Todos" selected>Todos</option>
                 </select>
             </div>
             <div class="flex flex-col w-32">
@@ -108,7 +109,7 @@
                         <div class="relative w-full h-72"><canvas id="isoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
-                    <!-- Gráfico 3: Consumo de Aceite (AHORA GRÁFICO DE LÍNEAS POR EQUIPO) -->
+                    <!-- Gráfico 3: Consumo de Aceite -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite (N68 / X68)</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en un Equipo (línea) para ver despachos</p>
@@ -285,7 +286,17 @@
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
-        // Obtener equipos seleccionados en el select múltiple
+        // Obtener Años seleccionados en el select múltiple
+        function getYearsSeleccionados() {
+            const select = document.getElementById('yearFilter');
+            const options = Array.from(select.selectedOptions).map(o => o.value);
+            return {
+                valores: options,
+                esTodos: options.length === 0 || options.includes('Todos')
+            };
+        }
+
+        // Obtener Equipos seleccionados en el select múltiple
         function getEquiposSeleccionados() {
             const select = document.getElementById('equipoFilter');
             const options = Array.from(select.selectedOptions).map(o => o.value);
@@ -295,16 +306,17 @@
             };
         }
 
+        // Eventos Generales
         function generarEventoTiempo(origenDatos, nombreColumnas, nombreGrafico) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const etiquetaSeleccionada = chart.data.labels[idx];
                     
-                    const yearSel = document.getElementById('yearFilter').value;
+                    const yrFilter = getYearsSeleccionados();
+                    const eqFilter = getEquiposSeleccionados();
                     const flotaSel = document.getElementById('flotaFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
-                    const eqFilter = getEquiposSeleccionados();
 
                     let baseDatos = [];
                     if (origenDatos === 'Trakka') baseDatos = dataTrakka;
@@ -315,9 +327,8 @@
                         const parsedDate = parseFecha(fechaBase);
                         if (!parsedDate) return false;
                         
-                        if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
+                        if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
-                        
                         if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
 
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
@@ -328,6 +339,7 @@
             };
         }
 
+        // Evento Específico para Consumo (por Equipo)
         function generarEventoConsumo(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -337,10 +349,10 @@
                     
                     const equipoSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
-                    const yearSel = document.getElementById('yearFilter').value;
+                    const yrFilter = getYearsSeleccionados();
+                    const eqFilter = getEquiposSeleccionados();
                     const flotaSel = document.getElementById('flotaFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
-                    const eqFilter = getEquiposSeleccionados();
 
                     const datosFiltrados = dataConsumo.filter(d => {
                         const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -348,7 +360,7 @@
                         const parsedDate = parseFecha(fechaBase);
                         if (!parsedDate) return false;
                         
-                        if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
+                        if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
                         if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return false;
                         
@@ -366,6 +378,7 @@
             };
         }
 
+        // Evento Específico para Cilindros (por Cod Comp)
         function generarEventoCilindros(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -375,10 +388,10 @@
                     
                     const codCompSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
-                    const yearSel = document.getElementById('yearFilter').value;
+                    const yrFilter = getYearsSeleccionados();
+                    const eqFilter = getEquiposSeleccionados();
                     const flotaSel = document.getElementById('flotaFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
-                    const eqFilter = getEquiposSeleccionados();
 
                     const datosFiltrados = dataComponentes.filter(d => {
                         const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -386,7 +399,7 @@
                         const parsedDate = parseFecha(fechaBase);
                         if (!parsedDate) return false;
                         
-                        if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
+                        if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return false;
                         if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
                         
@@ -405,9 +418,9 @@
         }
 
         function procesarYDibujarTodo() {
-            const yearSel = document.getElementById('yearFilter').value;
-            const flotaSel = document.getElementById('flotaFilter').value;
+            const yrFilter = getYearsSeleccionados();
             const eqFilter = getEquiposSeleccionados();
+            const flotaSel = document.getElementById('flotaFilter').value;
             const codexSel = document.getElementById('codexFilter').value;
             const codCompSel = document.getElementById('codCompFilter').value;
             const dimTiempo = document.getElementById('timeDimension').value;
@@ -417,7 +430,8 @@
             dataTrakka.forEach(d => {
                 const parsedDate = parseFecha(d['Fecha Calculada']);
                 if (!parsedDate) return;
-                if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
+                
+                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return;
                 
@@ -447,7 +461,8 @@
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
                 const parsedDate = parseFecha(fechaBase);
                 if (!parsedDate) return;
-                if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
+                
+                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return;
                 if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return;
                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return;
@@ -491,7 +506,8 @@
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
                 const parsedDate = parseFecha(fechaBase);
                 if (!parsedDate) return;
-                if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
+                
+                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return;
                 
@@ -583,7 +599,7 @@
                     onClick: (e, elements, chart) => {
                         if (elements.length > 0) {
                             const equipoPalaSelec = chart.data.labels[elements[0].index];
-                            const yearSel = document.getElementById('yearFilter').value;
+                            const yrFilter = getYearsSeleccionados();
                             const eqFilter = getEquiposSeleccionados();
                             
                             const datosFiltrados = dataComponentes.filter(d => {
@@ -591,7 +607,7 @@
                                 if (ep !== equipoPalaSelec) return false;
                                 
                                 const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
-                                if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
+                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
                                 if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
                                 
                                 const codexSel = document.getElementById('codexFilter').value;
@@ -663,7 +679,7 @@
 
             if (charts.consumo) charts.consumo.destroy();
             charts.consumo = new Chart(document.getElementById('consumoChart'), {
-                type: 'line', // VUELVE A SER GRÁFICO DE LÍNEAS
+                type: 'line',
                 data: { labels: labelsTiempo, datasets: consumoDatasets },
                 options: { 
                     responsive: true, maintainAspectRatio: false,
@@ -700,13 +716,13 @@
                     onClick: (e, elements, chart) => {
                         if (elements.length > 0) {
                             const codCompSeleccionado = chart.data.labels[elements[0].index];
-                            const yearSel = document.getElementById('yearFilter').value;
+                            const yrFilter = getYearsSeleccionados();
                             const eqFilter = getEquiposSeleccionados();
                             
                             const datosFiltrados = dataComponentes.filter(d => {
                                 if ((d['Cod Comp'] || '').trim() !== codCompSeleccionado) return false;
                                 const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
-                                if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
+                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
                                 
                                 const flotaSel = document.getElementById('flotaFilter').value;
                                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
