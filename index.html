@@ -34,25 +34,31 @@
 
         <!-- Barra de Filtros -->
         <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
-            <div class="flex flex-col w-36">
+            <div class="flex flex-col w-32">
+                <label for="yearFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Año</label>
+                <select id="yearFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
+            <div class="flex flex-col w-32">
                 <label for="flotaFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Flota</label>
                 <select id="flotaFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todas">Todas</option>
                 </select>
             </div>
-            <div class="flex flex-col w-36">
+            <div class="flex flex-col w-32">
                 <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo</label>
                 <select id="equipoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-36">
+            <div class="flex flex-col w-32">
                 <label for="codexFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Filtro Codex</label>
                 <select id="codexFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-48">
+            <div class="flex flex-col w-40">
                 <label for="timeDimension" class="text-xs font-bold text-gray-600 uppercase mb-1">Eje X (Fechas)</label>
                 <select id="timeDimension" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="year">Año</option>
@@ -187,29 +193,6 @@
             });
         };
 
-        function inicializarFiltros() {
-            const flotas = new Set(), equipos = new Set(), codexSet = new Set();
-            dataTrakka.forEach(row => {
-                if (row['Flota']) flotas.add(row['Flota'].trim());
-                if (row['Equipo']) equipos.add(row['Equipo'].trim());
-            });
-            dataComponentes.forEach(row => {
-                if (row['Codex']) codexSet.add(row['Codex'].trim());
-            });
-            const flotaSelect = document.getElementById('flotaFilter');
-            const equipoSelect = document.getElementById('equipoFilter');
-            const codexSelect = document.getElementById('codexFilter');
-            Array.from(flotas).sort().forEach(f => flotaSelect.appendChild(new Option(f, f)));
-            Array.from(equipos).sort().forEach(e => equipoSelect.appendChild(new Option(e, e)));
-            Array.from(codexSet).sort().forEach(c => {
-                const opt = new Option(c, c);
-                if (c === 'HCO') opt.selected = true; 
-                codexSelect.appendChild(opt);
-            });
-        }
-
-        const num = str => parseFloat((str||'').toString().replace(',', '.')) || 0;
-
         function parseFecha(fechaStr) {
             if (!fechaStr) return null;
             let f = fechaStr.toString().trim();
@@ -224,6 +207,44 @@
             }
             return null;
         }
+
+        function inicializarFiltros() {
+            const flotas = new Set(), equipos = new Set(), codexSet = new Set(), añosSet = new Set();
+            
+            const procesarFechaParaAño = (fecha) => {
+                const parsed = parseFecha(fecha);
+                if (parsed) añosSet.add(parsed.año);
+            };
+
+            dataTrakka.forEach(row => {
+                if (row['Flota']) flotas.add(row['Flota'].trim());
+                if (row['Equipo']) equipos.add(row['Equipo'].trim());
+                procesarFechaParaAño(row['Fecha Calculada']);
+            });
+            dataComponentes.forEach(row => {
+                if (row['Codex']) codexSet.add(row['Codex'].trim());
+                procesarFechaParaAño(row['Fecha Calculada'] || row['Fecha']);
+            });
+            dataConsumo.forEach(row => {
+                procesarFechaParaAño(row['Fecha Calculada'] || row['Fecha']);
+            });
+
+            const yearSelect = document.getElementById('yearFilter');
+            const flotaSelect = document.getElementById('flotaFilter');
+            const equipoSelect = document.getElementById('equipoFilter');
+            const codexSelect = document.getElementById('codexFilter');
+            
+            Array.from(añosSet).sort().reverse().forEach(a => yearSelect.appendChild(new Option(a, a)));
+            Array.from(flotas).sort().forEach(f => flotaSelect.appendChild(new Option(f, f)));
+            Array.from(equipos).sort().forEach(e => equipoSelect.appendChild(new Option(e, e)));
+            Array.from(codexSet).sort().forEach(c => {
+                const opt = new Option(c, c);
+                if (c === 'HCO') opt.selected = true; 
+                codexSelect.appendChild(opt);
+            });
+        }
+
+        const num = str => parseFloat((str||'').toString().replace(',', '.')) || 0;
 
         function getXKey(fechaStr, dimension) {
             const parsed = parseFecha(fechaStr);
@@ -250,37 +271,25 @@
         }
 
         // ----------- LÓGICA DEL MODAL INTERACTIVO -----------
-        function cerrarModal() {
-            document.getElementById('dataModal').classList.add('hidden');
-        }
+        function cerrarModal() { document.getElementById('dataModal').classList.add('hidden'); }
 
         function abrirModalDatos(titulo, columnas, datos) {
             document.getElementById('modalTitle').textContent = titulo;
-            
-            // Construir encabezados
             const thead = document.getElementById('modalThead');
             thead.innerHTML = `<tr>${columnas.map(col => `<th class="px-4 py-3 font-bold text-left border-b">${col}</th>`).join('')}</tr>`;
-            
-            // Construir filas
             const tbody = document.getElementById('modalTbody');
-            tbody.innerHTML = datos.map(fila => `
-                <tr class="hover:bg-blue-50 transition-colors">
-                    ${columnas.map(col => `<td class="px-4 py-2 border-b border-gray-100">${fila[col] || '-'}</td>`).join('')}
-                </tr>
-            `).join('');
-
+            tbody.innerHTML = datos.map(fila => `<tr class="hover:bg-blue-50 transition-colors">${columnas.map(col => `<td class="px-4 py-2 border-b border-gray-100">${fila[col] || '-'}</td>`).join('')}</tr>`).join('');
             document.getElementById('modalCount').textContent = `Total registros mostrados: ${datos.length}`;
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
-        // Generador de eventos OnClick para gráficos de Tiempo
         function generarEventoTiempo(origenDatos, nombreColumnas, nombreGrafico) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const etiquetaSeleccionada = chart.data.labels[idx];
                     
-                    // Aplicar los filtros actuales
+                    const yearSel = document.getElementById('yearFilter').value;
                     const flotaSel = document.getElementById('flotaFilter').value;
                     const equipoSel = document.getElementById('equipoFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
@@ -291,24 +300,24 @@
                     else if (origenDatos === 'Consumo') baseDatos = dataConsumo;
 
                     const datosFiltrados = baseDatos.filter(d => {
-                        // Filtros globales
+                        const fechaBase = d['Fecha Calculada'] || d['Fecha'];
+                        if (!fechaBase) return false;
+                        const parsedDate = parseFecha(fechaBase);
+                        if (!parsedDate) return false;
+                        
+                        if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
                         if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return false;
                         
-                        // Filtro de Codex (solo aplica para Componentes)
                         if (origenDatos === 'Componentes') {
                             const codexSel = document.getElementById('codexFilter').value;
                             if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
-                            
                             const compSel = document.getElementById('compFilter').value;
                             const tipo = agruparComponentePrincipal(d['Tipo De Componente'] || '');
-                            if (!tipo) return false; // Solo principales
+                            if (!tipo) return false; 
                             if (compSel !== 'Todos' && tipo !== compSel) return false;
                         }
 
-                        // Filtro de la barra clickeada (Tiempo)
-                        const fechaBase = d['Fecha Calculada'] || d['Fecha'];
-                        if (!fechaBase) return false;
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
                     });
 
@@ -319,6 +328,7 @@
         // ---------------------------------------------------
 
         function procesarYDibujarTodo() {
+            const yearSel = document.getElementById('yearFilter').value;
             const flotaSel = document.getElementById('flotaFilter').value;
             const equipoSel = document.getElementById('equipoFilter').value;
             const codexSel = document.getElementById('codexFilter').value;
@@ -327,18 +337,22 @@
 
             const statsTrakka = {};
             dataTrakka.forEach(d => {
+                const parsedDate = parseFecha(d['Fecha Calculada']);
+                if (!parsedDate) return;
+                if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
                 
                 const xKey = getXKey(d['Fecha Calculada'], dimTiempo);
                 if (!xKey) return;
-                if (!statsTrakka[xKey]) statsTrakka[xKey] = { h:0, c:0, p:0, cr:0, a:0, iso4:0, iso6:0, iso14:0, count:0 };
+                if (!statsTrakka[xKey]) statsTrakka[xKey] = { h:0, c:0, p:0, cr:0, a:0, si:0, iso4:0, iso6:0, iso14:0, count:0 };
                 
                 statsTrakka[xKey].h += num(d['Hierro (ppm)']);
                 statsTrakka[xKey].c += num(d['Cobre (ppm)']);
                 statsTrakka[xKey].p += num(d['Plomo (ppm)']);
                 statsTrakka[xKey].cr += num(d['Cromo (ppm)']);
                 statsTrakka[xKey].a += num(d['Aluminio (ppm)']);
+                statsTrakka[xKey].si += num(d['Silicio (ppm)']); // Tierra
                 statsTrakka[xKey].iso4 += num(d['ISO 4406:1999 > 04µ']);
                 statsTrakka[xKey].iso6 += num(d['ISO 4406:1999 > 06µ']);
                 statsTrakka[xKey].iso14 += num(d['ISO 4406:1999 > 14µ']);
@@ -350,6 +364,10 @@
             const statsPala = {}; 
 
             dataComponentes.forEach(d => {
+                const fechaBase = d['Fecha Calculada'] || d['Fecha'];
+                const parsedDate = parseFecha(fechaBase);
+                if (!parsedDate) return;
+                if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return;
                 if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return;
                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return;
@@ -364,11 +382,10 @@
                 if (categoriaPrincipal) {
                     if (compSel !== 'Todos' && categoriaPrincipal !== compSel) return;
                     
-                    // Solo contar en pala si es de la categoría principal filtrada
                     if (!statsPala[equipoPala]) statsPala[equipoPala] = 0;
                     statsPala[equipoPala]++;
 
-                    const xKey = getXKey(d['Fecha Calculada'] || d['Fecha'], dimTiempo);
+                    const xKey = getXKey(fechaBase, dimTiempo);
                     if (xKey) {
                         if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = 0;
                         statsComponentesTiempo[xKey]++;
@@ -387,9 +404,14 @@
 
             const statsConsumo = {};
             dataConsumo.forEach(d => {
+                const fechaBase = d['Fecha Calculada'] || d['Fecha'];
+                const parsedDate = parseFecha(fechaBase);
+                if (!parsedDate) return;
+                if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
-                const xKey = getXKey(d['Fecha Calculada'] || d['Fecha'], dimTiempo);
+                
+                const xKey = getXKey(fechaBase, dimTiempo);
                 if (!xKey) return;
                 if (!statsConsumo[xKey]) statsConsumo[xKey] = 0;
                 statsConsumo[xKey] += num(d['Despachado'] || d['Valor']);
@@ -398,18 +420,18 @@
             const etiquetasTiempo = new Set([...Object.keys(statsTrakka), ...Object.keys(statsComponentesTiempo), ...Object.keys(statsConsumo)]);
             const labelsTiempo = Array.from(etiquetasTiempo).sort();
 
-            const dHierro = [], dCobre = [], dPlomo = [], dCromo = [], dAlum = [];
+            const dHierro = [], dCobre = [], dSilicio = [], dAlum = [];
             const dIso4 = [], dIso6 = [], dIso14 = [];
             const dCilindros = [], dConsumo = [];
 
             labelsTiempo.forEach(l => {
                 const tk = statsTrakka[l];
                 if (tk) {
-                    dHierro.push(tk.h / tk.count); dCobre.push(tk.c / tk.count); dPlomo.push(tk.p / tk.count);
-                    dCromo.push(tk.cr / tk.count); dAlum.push(tk.a / tk.count);
+                    dHierro.push(tk.h / tk.count); dCobre.push(tk.c / tk.count); 
+                    dAlum.push(tk.a / tk.count); dSilicio.push(tk.si / tk.count);
                     dIso4.push(tk.iso4 / tk.count); dIso6.push(tk.iso6 / tk.count); dIso14.push(tk.iso14 / tk.count);
                 } else {
-                    dHierro.push(0); dCobre.push(0); dPlomo.push(0); dCromo.push(0); dAlum.push(0);
+                    dHierro.push(0); dCobre.push(0); dAlum.push(0); dSilicio.push(0);
                     dIso4.push(0); dIso6.push(0); dIso14.push(0);
                 }
                 dCilindros.push(statsComponentesTiempo[l] || 0);
@@ -420,7 +442,7 @@
             const dataBoxplot = labelsBoxplot.map(cod => statsBoxplot[cod]);
 
             dibujarGraficos(
-                labelsTiempo, {dHierro, dCobre, dPlomo, dCromo, dAlum}, {dIso4, dIso6, dIso14}, 
+                labelsTiempo, {dHierro, dCobre, dAlum, dSilicio}, {dIso4, dIso6, dIso14}, 
                 dCilindros, dConsumo, labelsBoxplot, dataBoxplot, labelsPala, dataPala
             );
         }
@@ -433,16 +455,19 @@
                 type: 'bar',
                 data: { labels: labelsPala, datasets: [{ label: 'Componentes Removidos', data: dataPala, backgroundColor: '#1e3a8a', borderRadius: 3 }] },
                 options: {
-                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
                     scales: { x: { title: { display: true, text: 'Cantidad' } }, y: { title: { display: true, text: 'Equipo' } } },
                     onClick: (e, elements, chart) => {
                         if (elements.length > 0) {
                             const equipoPalaSelec = chart.data.labels[elements[0].index];
+                            const yearSel = document.getElementById('yearFilter').value;
                             
                             const datosFiltrados = dataComponentes.filter(d => {
                                 const ep = (d['Equipo'] || d['Equipo/EGI'] || '').trim();
                                 if (ep !== equipoPalaSelec) return false;
+                                
+                                const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
+                                if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
                                 
                                 const codexSel = document.getElementById('codexFilter').value;
                                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
@@ -459,13 +484,9 @@
                 }
             });
 
-            // Opciones comunes para gráficos de tiempo interactivas
-            const optTiempo = (origen, columnas, nombre) => ({
-                responsive: true, maintainAspectRatio: false,
-                onClick: generarEventoTiempo(origen, columnas, nombre)
-            });
+            const optTiempo = (origen, columnas, nombre) => ({ responsive: true, maintainAspectRatio: false, onClick: generarEventoTiempo(origen, columnas, nombre) });
 
-            // 1. Desgaste - INTERACTIVO
+            // 1. Desgaste con LÍMITES CONDENATORIOS
             if (charts.desgaste) charts.desgaste.destroy();
             charts.desgaste = new Chart(document.getElementById('desgasteChart'), {
                 type: 'line',
@@ -473,11 +494,27 @@
                     { label: 'Hierro', data: tk.dHierro, borderColor: '#ef4444', tension: 0.2 },
                     { label: 'Cobre', data: tk.dCobre, borderColor: '#10b981', tension: 0.2 },
                     { label: 'Aluminio', data: tk.dAlum, borderColor: '#f59e0b', tension: 0.2 },
-                    { label: 'Silicio', data: tk.dPlomo, borderColor: '#6b7280', tension: 0.2 }
-                ]}, options: optTiempo('Trakka', ['Equipo', 'Fecha Calculada', 'Hierro (ppm)', 'Cobre (ppm)', 'Aluminio (ppm)', 'Silicio (ppm)'], 'Desgaste Metales')
+                    { label: 'Tierra (Silicio)', data: tk.dSilicio, borderColor: '#000000', tension: 0.2 }
+                ]}, 
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    onClick: generarEventoTiempo('Trakka', ['Equipo', 'Fecha Calculada', 'Hierro (ppm)', 'Cobre (ppm)', 'Aluminio (ppm)', 'Silicio (ppm)'], 'Desgaste Metales'),
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                alW: { type: 'line', yMin: 10, yMax: 10, borderColor: '#facc15', borderWidth: 2, borderDash: [5,5], label: { content: 'Aluminio Warning', display: true, position: 'start', backgroundColor: '#facc15', color: '#854d0e', font: {size: 10} } },
+                                alC: { type: 'line', yMin: 15, yMax: 15, borderColor: '#eab308', borderWidth: 2, borderDash: [5,5], label: { content: 'Aluminio Critical', display: true, position: 'start', backgroundColor: '#eab308', color: '#ffffff', font: {size: 10} } },
+                                feW: { type: 'line', yMin: 20, yMax: 20, borderColor: '#fca5a5', borderWidth: 2, borderDash: [5,5], label: { content: 'Hierro Warning', display: true, position: 'start', backgroundColor: '#fca5a5', color: '#7f1d1d', font: {size: 10} } },
+                                feC: { type: 'line', yMin: 30, yMax: 30, borderColor: '#dc2626', borderWidth: 2, borderDash: [5,5], label: { content: 'Hierro Critical', display: true, position: 'start', backgroundColor: '#dc2626', color: '#ffffff', font: {size: 10} } },
+                                tiW: { type: 'line', yMin: 15, yMax: 15, borderColor: '#9ca3af', borderWidth: 2, borderDash: [5,5], label: { content: 'Tierra Warning', display: true, position: 'start', backgroundColor: '#9ca3af', color: '#111827', font: {size: 10} } },
+                                tiC: { type: 'line', yMin: 20, yMax: 20, borderColor: '#000000', borderWidth: 2, borderDash: [5,5], label: { content: 'Tierra Critical', display: true, position: 'start', backgroundColor: '#000000', color: '#ffffff', font: {size: 10} } }
+                            }
+                        }
+                    }
+                }
             });
 
-            // 2. ISO - INTERACTIVO
+            // 2. ISO 
             if (charts.iso) charts.iso.destroy();
             charts.iso = new Chart(document.getElementById('isoChart'), {
                 type: 'line',
@@ -504,7 +541,7 @@
                 }
             });
 
-            // 3. Consumo - INTERACTIVO
+            // 3. Consumo 
             if (charts.consumo) charts.consumo.destroy();
             charts.consumo = new Chart(document.getElementById('consumoChart'), {
                 type: 'line',
@@ -513,7 +550,7 @@
                 ]}, options: optTiempo('Consumo', ['Equipo', 'Fecha Calculada', 'Despachado', 'Valor', 'Item Desc'], 'Despachos de Aceite')
             });
 
-            // 4. Cilindros - INTERACTIVO
+            // 4. Cilindros 
             if (charts.cilindros) charts.cilindros.destroy();
             charts.cilindros = new Chart(document.getElementById('cilindrosChart'), {
                 type: 'bar',
@@ -522,7 +559,7 @@
                 ]}, options: optTiempo('Componentes', ['Equipo/EGI', 'Fecha Calculada', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición'], 'Componentes Removidos')
             });
 
-            // 5. Boxplot - INTERACTIVO
+            // 5. Boxplot 
             if (charts.boxplot) charts.boxplot.destroy();
             charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
                 type: 'boxplot',
@@ -535,9 +572,12 @@
                     onClick: (e, elements, chart) => {
                         if (elements.length > 0) {
                             const codCompSeleccionado = chart.data.labels[elements[0].index];
+                            const yearSel = document.getElementById('yearFilter').value;
                             
                             const datosFiltrados = dataComponentes.filter(d => {
                                 if ((d['Cod Comp'] || '').trim() !== codCompSeleccionado) return false;
+                                const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
+                                if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
                                 
                                 const flotaSel = document.getElementById('flotaFilter').value;
                                 const equipoSel = document.getElementById('equipoFilter').value;
@@ -555,6 +595,7 @@
             });
         }
 
+        document.getElementById('yearFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('flotaFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('equipoFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('codexFilter').addEventListener('change', procesarYDibujarTodo);
