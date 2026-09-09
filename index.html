@@ -29,23 +29,23 @@
         </div>
 
         <!-- Barra de Filtros -->
-        <div id="filtrosContainer" class="hidden flex-wrap gap-6 mb-8 bg-gray-50 p-5 rounded-md border border-gray-200 shadow-sm items-start">
+        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-8 bg-gray-50 p-5 rounded-md border border-gray-200 shadow-sm items-start">
             
-            <div class="flex flex-col w-40">
+            <div class="flex flex-col w-36">
                 <label for="flotaFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Flota</label>
                 <select id="flotaFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todas">Todas</option>
                 </select>
             </div>
 
-            <div class="flex flex-col w-40">
+            <div class="flex flex-col w-36">
                 <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo</label>
                 <select id="equipoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
                 </select>
             </div>
 
-            <div class="flex flex-col w-40">
+            <div class="flex flex-col w-36">
                 <label for="codexFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Filtro Codex</label>
                 <select id="codexFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
@@ -58,6 +58,25 @@
                     <option value="year">Año</option>
                     <option value="month">Mes</option>
                     <option value="year-month" selected>Año - Mes</option>
+                </select>
+            </div>
+
+            <!-- NUEVO: Filtro de Componentes Principales -->
+            <div class="flex flex-col w-56">
+                <label for="compFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Componente Principal</label>
+                <select id="compFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Todos">Todos los Principales</option>
+                    <option value="BOMBAS -7">BOMBAS -7</option>
+                    <option value="BOMBAS DE ALTA">BOMBAS DE ALTA</option>
+                    <option value="BOMBA DE BAJA">BOMBA DE BAJA</option>
+                    <option value="MOTOR DE GIRO">MOTOR DE GIRO</option>
+                    <option value="MOTOR DE PROPULSION">MOTOR DE PROPULSION</option>
+                    <option value="CILINDRO DE BOOM">CILINDRO DE BOOM</option>
+                    <option value="CILINDRO DE NIVELACION">CILINDRO DE NIVELACION</option>
+                    <option value="CILINDRO DE BRAZO">CILINDRO DE BRAZO</option>
+                    <option value="CILINDRO DE CUCHARON">CILINDRO DE CUCHARON</option>
+                    <option value="CILINDRO DE APERTURA">CILINDRO DE APERTURA</option>
+                    <option value="BOMBAS GENERAL">BOMBAS GENERAL</option>
                 </select>
             </div>
 
@@ -86,7 +105,7 @@
 
             <!-- Gráfico 4: Cilindros y Bombas -->
             <div class="border rounded-lg p-4 bg-white shadow-sm">
-                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Cambio de Cilindros y Bombas Hidráulicas</h3>
+                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Cambios del Componente Seleccionado</h3>
                 <div class="relative w-full h-72"><canvas id="cilindrosChart"></canvas></div>
             </div>
 
@@ -185,7 +204,6 @@
             return `${parsed.año}-${parsed.mes}`;
         }
 
-        // Función para limpiar y agrupar componentes en categorías principales
         function agruparComponentePrincipal(tipoRaw) {
             const tipo = tipoRaw.toUpperCase();
             if (tipo.includes('BOMBA -7') || tipo.includes('BOMBAS -7')) return 'BOMBAS -7';
@@ -199,7 +217,7 @@
             if (tipo.includes('CILINDRO DE CUCHARON') || tipo.includes('CILINDRO CUCHARON')) return 'CILINDRO DE CUCHARON';
             if (tipo.includes('CILINDRO DE APERTURA') || tipo.includes('CILINDRO APERTURA')) return 'CILINDRO DE APERTURA';
             if (tipo.includes('BOMBA GENERAL') || tipo.includes('BOMBAS GENERAL')) return 'BOMBAS GENERAL';
-            return null; // Si no es principal, retorna null para ignorarlo en el boxplot
+            return null; 
         }
 
         function procesarYDibujarTodo() {
@@ -207,6 +225,7 @@
             const equipoSel = document.getElementById('equipoFilter').value;
             const codexSel = document.getElementById('codexFilter').value;
             const dimTiempo = document.getElementById('timeDimension').value;
+            const compSel = document.getElementById('compFilter').value;
 
             // TRAKKA
             const statsTrakka = {};
@@ -241,20 +260,20 @@
                 const tipoRaw = (d['Tipo De Componente'] || '').trim();
                 if (!tipoRaw) return;
 
-                // 1. Agrupar para el gráfico de barras por tiempo (Solo Cilindros y Bombas)
-                const xKey = getXKey(d['Fecha Calculada'] || d['Fecha'], dimTiempo);
-                if (xKey) {
-                    if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = 0;
-                    if (tipoRaw.toUpperCase().includes('CILINDRO') || tipoRaw.toUpperCase().includes('BOMBA')) {
-                        statsComponentesTiempo[xKey]++;
-                    }
-                }
-
-                // 2. Agrupar para el Boxplot (Solo Categorías Principales)
                 const categoriaPrincipal = agruparComponentePrincipal(tipoRaw);
                 
-                // Si la función encontró que es un componente principal, lo agrega
                 if (categoriaPrincipal) {
+                    // Aplicar el nuevo filtro desplegable
+                    if (compSel !== 'Todos' && categoriaPrincipal !== compSel) return;
+
+                    // 1. Agrupar para el gráfico de barras por tiempo
+                    const xKey = getXKey(d['Fecha Calculada'] || d['Fecha'], dimTiempo);
+                    if (xKey) {
+                        if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = 0;
+                        statsComponentesTiempo[xKey]++;
+                    }
+
+                    // 2. Agrupar para el Boxplot
                     if (!statsBoxplot[categoriaPrincipal]) statsBoxplot[categoriaPrincipal] = [];
                     const horas = num(d['Horas del Comp. en la posición']);
                     if (horas > 0) {
@@ -340,7 +359,7 @@
                 ]}, options: chartOpts
             });
 
-            // 4. Cilindros y Bombas
+            // 4. Componentes Removidos
             if (charts.cilindros) charts.cilindros.destroy();
             charts.cilindros = new Chart(document.getElementById('cilindrosChart'), {
                 type: 'bar',
@@ -349,7 +368,7 @@
                 ]}, options: chartOpts
             });
 
-            // 5. Boxplot (Eje X = Componente Principal)
+            // 5. Boxplot
             if (charts.boxplot) charts.boxplot.destroy();
             charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
                 type: 'boxplot',
@@ -382,6 +401,7 @@
         document.getElementById('equipoFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('codexFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('timeDimension').addEventListener('change', procesarYDibujarTodo);
+        document.getElementById('compFilter').addEventListener('change', procesarYDibujarTodo);
     </script>
 </body>
 </html>
