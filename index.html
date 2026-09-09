@@ -107,7 +107,7 @@
                         <div class="relative w-full h-72"><canvas id="isoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
-                    <!-- Gráfico 3: Consumo de Aceite (Líneas) -->
+                    <!-- Gráfico 3: Consumo de Aceite -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite (N68 / X68)</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en una línea para ver despachos de ese Equipo</p>
@@ -129,10 +129,10 @@
                     <div class="relative w-full h-80"><canvas id="boxplotChart" class="cursor-pointer"></canvas></div>
                 </div>
                 
-                <!-- NUEVO: Gráfico de Dispersión (Scatter) -->
-                <div class="border rounded-lg p-4 bg-white shadow-sm w-full">
-                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite por Equipo</h3>
-                    <p class="text-[10px] text-gray-400 mb-2">Muestra puntos individuales de despacho. Click en un punto para ver su detalle exacto.</p>
+                <!-- Gráfico de Dispersión (Frecuencia de Cambio) -->
+                <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
+                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Vida Útil (Frecuencia de Cambio)</h3>
+                    <p class="text-[10px] text-gray-400 mb-2">Cada punto es un componente removido. Identifica dónde se agrupan los puntos para definir tu frecuencia de cambio ideal.</p>
                     <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
                 </div>
 
@@ -303,7 +303,6 @@
             return { valores: options, esTodos: options.length === 0 || options.includes('Todos') };
         }
 
-        // Eventos OnClick
         function generarEventoTiempo(origenDatos, nombreColumnas, nombreGrafico) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -444,11 +443,14 @@
                 statsTrakka[xKey].count++;
             });
 
-            // 2. Componentes
+            // 2. Componentes (Barras y Boxplot) + NUEVO: Dispersión de Frecuencia
             const statsComponentesTiempo = {}; 
             const codCompsActivos = new Set();
             const statsBoxplot = {};
             const statsPala = {}; 
+            
+            // Estructura para el scatter plot: agrupar por Cod Comp
+            const scatterDataPorCodComp = {};
 
             dataComponentes.forEach(d => {
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -481,9 +483,20 @@
                         codCompsActivos.add(codComp);
                     }
                     
-                    if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
                     const horas = num(d['Horas del Comp. en la posición']);
-                    if (horas > 0) statsBoxplot[codComp].push(horas);
+                    if (horas > 0) {
+                        // Para el Boxplot
+                        if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
+                        statsBoxplot[codComp].push(horas);
+
+                        // Para el gráfico de Dispersión
+                        if (!scatterDataPorCodComp[codComp]) scatterDataPorCodComp[codComp] = [];
+                        scatterDataPorCodComp[codComp].push({
+                            x: xKey,
+                            y: horas,
+                            raw: d // Guardamos la fila entera para mostrarla luego en el modal
+                        });
+                    }
                 }
             });
 
@@ -491,10 +504,9 @@
             const labelsPala = sortedPala.map(item => item[0]);
             const dataPala = sortedPala.map(item => item[1]);
 
-            // 3. Consumo y Dispersión
+            // 3. Consumo 
             const statsConsumo = {};
             const equiposConsumoActivos = new Set();
-            const scatterDataPorEquipo = {};
             
             dataConsumo.forEach(d => {
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -512,23 +524,18 @@
                 const xKey = getXKey(fechaBase, dimTiempo);
                 if (!xKey) return;
                 
-                const galones = num(d['Despachado'] || d['Valor']);
-
-                // Agrupamiento para Líneas (Suma total)
                 if (!statsConsumo[xKey]) statsConsumo[xKey] = {};
                 if (!statsConsumo[xKey][eqConsumo]) statsConsumo[xKey][eqConsumo] = 0;
-                statsConsumo[xKey][eqConsumo] += galones;
+                
+                statsConsumo[xKey][eqConsumo] += num(d['Despachado'] || d['Valor']);
                 equiposConsumoActivos.add(eqConsumo);
-
-                // Agrupamiento para Dispersión (Puntos individuales)
-                if (galones > 0) {
-                    if (!scatterDataPorEquipo[eqConsumo]) scatterDataPorEquipo[eqConsumo] = [];
-                    scatterDataPorEquipo[eqConsumo].push({ x: xKey, y: galones });
-                }
             });
 
             // UNIFICAR ETIQUETAS DE TIEMPO
             const etiquetasTiempo = new Set([...Object.keys(statsTrakka), ...Object.keys(statsComponentesTiempo), ...Object.keys(statsConsumo)]);
+            // Validar que se agreguen las etiquetas del scatter también
+            Object.values(scatterDataPorCodComp).forEach(arr => arr.forEach(item => etiquetasTiempo.add(item.x)));
+            
             const labelsTiempo = Array.from(etiquetasTiempo).sort();
 
             const dHierro = [], dCobre = [], dSilicio = [], dAlum = [];
@@ -546,52 +553,53 @@
                 }
             });
 
-            // DATASETS CILINDROS
+            // DATASETS CILINDROS Y SCATTER
             const cilindrosDatasets = [];
+            const scatterDatasets = [];
             let colorIdx = 0;
+            
             Array.from(codCompsActivos).sort().forEach(cod => {
+                const colorActual = coloresComponentes[colorIdx % coloresComponentes.length];
+                
+                // Barras
                 const dataParaCod = labelsTiempo.map(l => {
                     return statsComponentesTiempo[l] && statsComponentesTiempo[l][cod] ? statsComponentesTiempo[l][cod] : 0;
                 });
                 cilindrosDatasets.push({
                     label: cod,
                     data: dataParaCod,
-                    backgroundColor: coloresComponentes[colorIdx % coloresComponentes.length]
+                    backgroundColor: colorActual
                 });
+
+                // Scatter (Dispersión de Horas)
+                if (scatterDataPorCodComp[cod]) {
+                    scatterDatasets.push({
+                        label: cod,
+                        data: scatterDataPorCodComp[cod],
+                        backgroundColor: colorActual,
+                        borderColor: colorActual,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    });
+                }
                 colorIdx++;
             });
 
-            // DATASETS CONSUMO (LÍNEAS) y SCATTER
+            // DATASETS CONSUMO (LÍNEAS)
             const consumoDatasets = [];
-            const scatterDatasets = [];
             let colorIdxConsumo = 0;
-            
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
-                const colorActual = coloresComponentes[colorIdxConsumo % coloresComponentes.length];
-                
-                // Líneas
                 const dataParaEq = labelsTiempo.map(l => {
                     return statsConsumo[l] && statsConsumo[l][eq] ? statsConsumo[l][eq] : 0;
                 });
                 consumoDatasets.push({
                     label: eq,
                     data: dataParaEq,
-                    borderColor: colorActual,
-                    backgroundColor: colorActual,
+                    borderColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length],
+                    backgroundColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length],
                     tension: 0.2,
                     fill: false
                 });
-
-                // Scatter
-                scatterDatasets.push({
-                    label: eq,
-                    data: scatterDataPorEquipo[eq] || [],
-                    backgroundColor: colorActual,
-                    borderColor: colorActual,
-                    pointRadius: 5,
-                    pointHoverRadius: 7
-                });
-
                 colorIdxConsumo++;
             });
 
@@ -755,7 +763,7 @@
                 }
             });
 
-            // NUEVO: Gráfico de Dispersión (Scatter)
+            // NUEVO: Gráfico de Dispersión (Frecuencia de Cambio)
             if (charts.scatter) charts.scatter.destroy();
             charts.scatter = new Chart(document.getElementById('scatterChart'), {
                 type: 'scatter',
@@ -763,46 +771,35 @@
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     scales: {
-                        x: { type: 'category', labels: labelsTiempo, title: { display: true, text: 'Fecha' } },
-                        y: { title: { display: true, text: 'Galones' } }
+                        x: { 
+                            type: 'category', 
+                            labels: labelsTiempo, 
+                            title: { display: true, text: 'Fecha de Remoción' },
+                            ticks: { maxRotation: 90, minRotation: 45 }
+                        },
+                        y: { 
+                            title: { display: true, text: 'Horas de Vida Útil' },
+                            beginAtZero: true
+                        }
                     },
                     plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
                     onClick: (e, elements, chart) => {
                         if (elements.length > 0) {
                             const datasetIdx = elements[0].datasetIndex;
                             const idx = elements[0].index;
+                            
+                            // Obtenemos el punto exacto al que se hizo clic
                             const punto = chart.data.datasets[datasetIdx].data[idx];
                             
-                            const etiquetaSeleccionada = punto.x;
-                            const galonesSeleccionados = punto.y;
-                            const equipoSeleccionado = chart.data.datasets[datasetIdx].label;
+                            // El 'punto' tiene una propiedad 'raw' que guardamos nosotros mismos al construir los datos
+                            const filaExacta = punto.raw;
                             
-                            const yrFilter = getYearsSeleccionados();
-                            const eqFilter = getEquiposSeleccionados();
-                            const flotaSel = document.getElementById('flotaFilter').value;
-                            const dimTiempo = document.getElementById('timeDimension').value;
-
-                            const datosFiltrados = dataConsumo.filter(d => {
-                                const fechaBase = d['Fecha Calculada'] || d['Fecha'];
-                                if (!fechaBase) return false;
-                                const parsedDate = parseFecha(fechaBase);
-                                if (!parsedDate) return false;
-                                
-                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
-                                if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
-                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return false;
-                                
-                                const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
-                                if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return false;
-
-                                const eq = (d['Equipo'] || 'Sin Equipo').trim();
-                                if (eq !== equipoSeleccionado) return false; 
-
-                                // Filtrar exactamente por la fecha y el valor puntual de galones (para identificar el despacho)
-                                return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada && num(d['Despachado'] || d['Valor']) === galonesSeleccionados;
-                            });
-
-                            abrirModalDatos(`Dispersión de Consumo: ${equipoSeleccionado} (${etiquetaSeleccionada} - ${galonesSeleccionados} Galones)`, ['Equipo', 'Fecha Calculada', 'Despachado', 'Valor', 'Item Desc'], datosFiltrados);
+                            // Lo enviamos a la tabla como un arreglo de 1 solo elemento
+                            abrirModalDatos(
+                                `Detalle de la pieza removida: ${filaExacta['Cod Comp']}`, 
+                                ['Equipo/EGI', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición', 'Fecha Calculada', 'Codex'], 
+                                [filaExacta]
+                            );
                         }
                     }
                 }
