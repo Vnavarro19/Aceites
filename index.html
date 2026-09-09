@@ -58,29 +58,19 @@
                     <option value="Todos">Todos</option>
                 </select>
             </div>
+            <!-- NUEVO: Filtro de Cod Comp -->
+            <div class="flex flex-col w-40">
+                <label for="codCompFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Cod Comp</label>
+                <select id="codCompFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
             <div class="flex flex-col w-40">
                 <label for="timeDimension" class="text-xs font-bold text-gray-600 uppercase mb-1">Eje X (Fechas)</label>
                 <select id="timeDimension" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="year">Año</option>
                     <option value="month">Mes</option>
                     <option value="year-month" selected>Año - Mes</option>
-                </select>
-            </div>
-            <div class="flex flex-col w-56">
-                <label for="compFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Componente Principal</label>
-                <select id="compFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="Todos">Todos los Principales</option>
-                    <option value="BOMBAS -7">BOMBAS -7</option>
-                    <option value="BOMBAS DE ALTA">BOMBAS DE ALTA</option>
-                    <option value="BOMBA DE BAJA">BOMBA DE BAJA</option>
-                    <option value="MOTOR DE GIRO">MOTOR DE GIRO</option>
-                    <option value="MOTOR DE PROPULSION">MOTOR DE PROPULSION</option>
-                    <option value="CILINDRO DE BOOM">CILINDRO DE BOOM</option>
-                    <option value="CILINDRO DE NIVELACION">CILINDRO DE NIVELACION</option>
-                    <option value="CILINDRO DE BRAZO">CILINDRO DE BRAZO</option>
-                    <option value="CILINDRO DE CUCHARON">CILINDRO DE CUCHARON</option>
-                    <option value="CILINDRO DE APERTURA">CILINDRO DE APERTURA</option>
-                    <option value="BOMBAS GENERAL">BOMBAS GENERAL</option>
                 </select>
             </div>
         </div>
@@ -101,7 +91,7 @@
             <div class="w-full xl:w-3/4 flex flex-col gap-6">
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Gráfico 1: Cilindros y Bombas (AHORA APILADO) -->
+                    <!-- Gráfico 1: Cilindros y Bombas -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Cambio de Cilindros y Bombas</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en un color para ver su detalle</p>
@@ -164,7 +154,6 @@
         let dataTrakka = [], dataComponentes = [], dataConsumo = [];
         let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null, pala: null };
 
-        // Paleta de colores para el desglose de componentes
         const coloresComponentes = [
             '#1e3a8a', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
             '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#84cc16'
@@ -215,7 +204,8 @@
         }
 
         function inicializarFiltros() {
-            const flotas = new Set(), equipos = new Set(), codexSet = new Set(), añosSet = new Set();
+            const flotas = new Set(), equipos = new Set(), codexSet = new Set(), añosSet = new Set(), codCompSet = new Set();
+            
             const procesarFechaParaAño = (fecha) => {
                 const parsed = parseFecha(fecha);
                 if (parsed) añosSet.add(parsed.año);
@@ -228,6 +218,7 @@
             });
             dataComponentes.forEach(row => {
                 if (row['Codex']) codexSet.add(row['Codex'].trim());
+                if (row['Cod Comp']) codCompSet.add(row['Cod Comp'].trim());
                 procesarFechaParaAño(row['Fecha Calculada'] || row['Fecha']);
             });
             dataConsumo.forEach(row => {
@@ -238,10 +229,13 @@
             const flotaSelect = document.getElementById('flotaFilter');
             const equipoSelect = document.getElementById('equipoFilter');
             const codexSelect = document.getElementById('codexFilter');
+            const codCompSelect = document.getElementById('codCompFilter');
             
             Array.from(añosSet).sort().reverse().forEach(a => yearSelect.appendChild(new Option(a, a)));
             Array.from(flotas).sort().forEach(f => flotaSelect.appendChild(new Option(f, f)));
             Array.from(equipos).sort().forEach(e => equipoSelect.appendChild(new Option(e, e)));
+            Array.from(codCompSet).sort().forEach(c => codCompSelect.appendChild(new Option(c, c)));
+            
             Array.from(codexSet).sort().forEach(c => {
                 const opt = new Option(c, c);
                 if (c === 'HCO') opt.selected = true; 
@@ -259,6 +253,8 @@
             return `${parsed.año}-${parsed.mes}`;
         }
 
+        // Se mantiene para dar un desglose ordenado en la barra apilada.
+        // Si no coincide con ninguno, retorna el nombre original para no ocultar datos.
         function agruparComponentePrincipal(tipoRaw) {
             const tipo = tipoRaw.toUpperCase();
             if (tipo.includes('BOMBA -7') || tipo.includes('BOMBAS -7')) return 'BOMBAS -7';
@@ -272,10 +268,9 @@
             if (tipo.includes('CILINDRO DE CUCHARON') || tipo.includes('CILINDRO CUCHARON')) return 'CILINDRO DE CUCHARON';
             if (tipo.includes('CILINDRO DE APERTURA') || tipo.includes('CILINDRO APERTURA')) return 'CILINDRO DE APERTURA';
             if (tipo.includes('BOMBA GENERAL') || tipo.includes('BOMBAS GENERAL')) return 'BOMBAS GENERAL';
-            return null; 
+            return tipoRaw; 
         }
 
-        // ----------- LÓGICA DEL MODAL INTERACTIVO -----------
         function cerrarModal() { document.getElementById('dataModal').classList.add('hidden'); }
 
         function abrirModalDatos(titulo, columnas, datos) {
@@ -317,10 +312,10 @@
                         if (origenDatos === 'Componentes') {
                             const codexSel = document.getElementById('codexFilter').value;
                             if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
-                            const compSel = document.getElementById('compFilter').value;
-                            const tipo = agruparComponentePrincipal(d['Tipo De Componente'] || '');
-                            if (!tipo) return false; 
-                            if (compSel !== 'Todos' && tipo !== compSel) return false;
+                            
+                            const codCompSel = document.getElementById('codCompFilter').value;
+                            const codComp = (d['Cod Comp'] || '').trim();
+                            if (codCompSel !== 'Todos' && codComp !== codCompSel) return false;
                         }
 
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
@@ -331,14 +326,13 @@
             };
         }
 
-        // EVENTO ESPECÍFICO PARA CILINDROS (Filtra por Color/Dataset seleccionado)
         function generarEventoCilindros(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const datasetIdx = elements[0].datasetIndex;
                     const etiquetaSeleccionada = chart.data.labels[idx];
-                    const componenteSeleccionado = chart.data.datasets[datasetIdx].label; // Nombre del componente clickeado
+                    const componenteSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
                     const yearSel = document.getElementById('yearFilter').value;
                     const flotaSel = document.getElementById('flotaFilter').value;
@@ -358,8 +352,12 @@
                         const codexSel = document.getElementById('codexFilter').value;
                         if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
                         
+                        const codCompSel = document.getElementById('codCompFilter').value;
+                        const codComp = (d['Cod Comp'] || '').trim();
+                        if (codCompSel !== 'Todos' && codComp !== codCompSel) return false;
+
                         const tipo = agruparComponentePrincipal(d['Tipo De Componente'] || '');
-                        if (tipo !== componenteSeleccionado) return false; // AQUÍ filtramos por el color seleccionado
+                        if (tipo !== componenteSeleccionado) return false; 
 
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
                     });
@@ -368,17 +366,16 @@
                 }
             };
         }
-        // ---------------------------------------------------
 
         function procesarYDibujarTodo() {
             const yearSel = document.getElementById('yearFilter').value;
             const flotaSel = document.getElementById('flotaFilter').value;
             const equipoSel = document.getElementById('equipoFilter').value;
             const codexSel = document.getElementById('codexFilter').value;
+            const codCompSel = document.getElementById('codCompFilter').value;
             const dimTiempo = document.getElementById('timeDimension').value;
-            const compSel = document.getElementById('compFilter').value;
 
-            // 1. Procesar Trakka
+            // 1. Trakka
             const statsTrakka = {};
             dataTrakka.forEach(d => {
                 const parsedDate = parseFecha(d['Fecha Calculada']);
@@ -403,8 +400,8 @@
                 statsTrakka[xKey].count++;
             });
 
-            // 2. Procesar Componentes
-            const statsComponentesTiempo = {}; // Ahora será { '2024-01': { 'CILINDRO DE BOOM': 2, ... }, ... }
+            // 2. Componentes
+            const statsComponentesTiempo = {}; 
             const tiposComponentesActivos = new Set();
             const statsBoxplot = {};
             const statsPala = {}; 
@@ -418,20 +415,19 @@
                 if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return;
                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return;
                 
+                const codComp = (d['Cod Comp'] || '').trim();
+                if (codCompSel !== 'Todos' && codComp !== codCompSel) return; // NUEVO FILTRO APLICADO
+                
                 const tipoRaw = (d['Tipo De Componente'] || '').trim();
                 const equipoPala = (d['Equipo'] || d['Equipo/EGI'] || 'Sin Equipo').trim();
-                const codComp = (d['Cod Comp'] || '').trim();
 
                 if (!tipoRaw) return;
                 const categoriaPrincipal = agruparComponentePrincipal(tipoRaw);
 
                 if (categoriaPrincipal) {
-                    if (compSel !== 'Todos' && categoriaPrincipal !== compSel) return;
-                    
                     if (!statsPala[equipoPala]) statsPala[equipoPala] = 0;
                     statsPala[equipoPala]++;
 
-                    // Agrupar para el desglose (Barras Apiladas)
                     const xKey = getXKey(fechaBase, dimTiempo);
                     if (xKey) {
                         if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = {};
@@ -440,7 +436,6 @@
                         tiposComponentesActivos.add(categoriaPrincipal);
                     }
                     
-                    // Boxplot
                     if (codComp) {
                         if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
                         const horas = num(d['Horas del Comp. en la posición']);
@@ -453,7 +448,7 @@
             const labelsPala = sortedPala.map(item => item[0]);
             const dataPala = sortedPala.map(item => item[1]);
 
-            // 3. Procesar Consumo
+            // 3. Consumo
             const statsConsumo = {};
             dataConsumo.forEach(d => {
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -469,7 +464,6 @@
                 statsConsumo[xKey] += num(d['Despachado'] || d['Valor']);
             });
 
-            // UNIFICAR ETIQUETAS DE TIEMPO
             const etiquetasTiempo = new Set([...Object.keys(statsTrakka), ...Object.keys(statsComponentesTiempo), ...Object.keys(statsConsumo)]);
             const labelsTiempo = Array.from(etiquetasTiempo).sort();
 
@@ -490,7 +484,6 @@
                 dConsumo.push(statsConsumo[l] || 0);
             });
 
-            // GENERAR DATASETS APILADOS PARA CILINDROS
             const cilindrosDatasets = [];
             let colorIdx = 0;
             Array.from(tiposComponentesActivos).sort().forEach(tipo => {
@@ -516,7 +509,6 @@
 
         function dibujarGraficos(labelsTiempo, tk, iso, cilindrosDatasets, consumo, labelsBoxplot, dataBoxplot, labelsPala, dataPala) {
             
-            // 0. Gráfico lateral (Palas) - INTERACTIVO
             if (charts.pala) charts.pala.destroy();
             charts.pala = new Chart(document.getElementById('palaChart'), {
                 type: 'bar',
@@ -534,12 +526,13 @@
                                 if (ep !== equipoPalaSelec) return false;
                                 const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
                                 if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
+                                
                                 const codexSel = document.getElementById('codexFilter').value;
                                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
-                                const compSel = document.getElementById('compFilter').value;
-                                const tipo = agruparComponentePrincipal(d['Tipo De Componente'] || '');
-                                if (!tipo) return false;
-                                if (compSel !== 'Todos' && tipo !== compSel) return false;
+                                
+                                const codCompSel = document.getElementById('codCompFilter').value;
+                                const codComp = (d['Cod Comp'] || '').trim();
+                                if (codCompSel !== 'Todos' && codComp !== codCompSel) return false;
                                 return true;
                             });
                             abrirModalDatos(`Componentes removidos en Pala: ${equipoPalaSelec}`, ['Equipo/EGI', 'Fecha Calculada', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición', 'Codex'], datosFiltrados);
@@ -550,7 +543,6 @@
 
             const optTiempo = (origen, columnas, nombre) => ({ responsive: true, maintainAspectRatio: false, onClick: generarEventoTiempo(origen, columnas, nombre) });
 
-            // 1. Desgaste con LÍMITES CONDENATORIOS
             if (charts.desgaste) charts.desgaste.destroy();
             charts.desgaste = new Chart(document.getElementById('desgasteChart'), {
                 type: 'line',
@@ -578,7 +570,6 @@
                 }
             });
 
-            // 2. ISO 
             if (charts.iso) charts.iso.destroy();
             charts.iso = new Chart(document.getElementById('isoChart'), {
                 type: 'line',
@@ -605,7 +596,6 @@
                 }
             });
 
-            // 3. Consumo 
             if (charts.consumo) charts.consumo.destroy();
             charts.consumo = new Chart(document.getElementById('consumoChart'), {
                 type: 'line',
@@ -614,26 +604,18 @@
                 ]}, options: optTiempo('Consumo', ['Equipo', 'Fecha Calculada', 'Despachado', 'Valor', 'Item Desc'], 'Despachos de Aceite')
             });
 
-            // 4. Cilindros y Bombas (APILADO CON EVENTO DE COLOR)
             if (charts.cilindros) charts.cilindros.destroy();
             charts.cilindros = new Chart(document.getElementById('cilindrosChart'), {
                 type: 'bar',
                 data: { labels: labelsTiempo, datasets: cilindrosDatasets },
                 options: {
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { stacked: true },
-                        y: { stacked: true, title: { display: true, text: 'Cantidad' } }
-                    },
-                    plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Cantidad' } } },
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
                     onClick: generarEventoCilindros(['Equipo/EGI', 'Fecha Calculada', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición'])
                 }
             });
 
-            // 5. Boxplot 
             if (charts.boxplot) charts.boxplot.destroy();
             charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
                 type: 'boxplot',
@@ -673,8 +655,8 @@
         document.getElementById('flotaFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('equipoFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('codexFilter').addEventListener('change', procesarYDibujarTodo);
+        document.getElementById('codCompFilter').addEventListener('change', procesarYDibujarTodo);
         document.getElementById('timeDimension').addEventListener('change', procesarYDibujarTodo);
-        document.getElementById('compFilter').addEventListener('change', procesarYDibujarTodo);
     </script>
 </body>
 </html>
