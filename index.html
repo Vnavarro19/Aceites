@@ -107,7 +107,7 @@
 
                     <!-- Gráfico 3: Consumo de Aceite -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
-                        <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite</h3>
+                        <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite (N68 / X68)</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en un punto para ver despachos</p>
                         <div class="relative w-full h-72"><canvas id="consumoChart" class="cursor-pointer"></canvas></div>
                     </div>
@@ -317,6 +317,12 @@
                             if (codCompSel !== 'Todos' && codComp !== codCompSel) return false;
                         }
 
+                        // Aplicar filtro de Ítem Desc (N68 y X68/EX68) solo para Consumo al abrir la tabla
+                        if (origenDatos === 'Consumo') {
+                            const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
+                            if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return false;
+                        }
+
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
                     });
 
@@ -332,7 +338,6 @@
                     const datasetIdx = elements[0].datasetIndex;
                     const etiquetaSeleccionada = chart.data.labels[idx];
                     
-                    // AHORA el nombre del componente clickeado es el Cod Comp
                     const codCompSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
                     const yearSel = document.getElementById('yearFilter').value;
@@ -354,7 +359,6 @@
                         if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
                         
                         const codComp = (d['Cod Comp'] || '').trim();
-                        // Filtrar exclusivamente por el Cod Comp clickeado en la leyenda
                         if (codComp !== codCompSeleccionado) return false; 
 
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
@@ -400,7 +404,7 @@
 
             // 2. Componentes
             const statsComponentesTiempo = {}; 
-            const codCompsActivos = new Set(); // Para la leyenda del grafico de barras
+            const codCompsActivos = new Set();
             const statsBoxplot = {};
             const statsPala = {}; 
 
@@ -422,7 +426,6 @@
                 if (!tipoRaw) return;
                 const categoriaPrincipal = agruparComponentePrincipal(tipoRaw);
 
-                // Si es un componente válido y tiene Cod Comp
                 if (categoriaPrincipal && codComp) {
                     if (!statsPala[equipoPala]) statsPala[equipoPala] = 0;
                     statsPala[equipoPala]++;
@@ -430,7 +433,6 @@
                     const xKey = getXKey(fechaBase, dimTiempo);
                     if (xKey) {
                         if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = {};
-                        // AHORA agrupamos por Cod Comp en lugar de Categoría Principal
                         if (!statsComponentesTiempo[xKey][codComp]) statsComponentesTiempo[xKey][codComp] = 0;
                         statsComponentesTiempo[xKey][codComp]++;
                         codCompsActivos.add(codComp);
@@ -446,7 +448,7 @@
             const labelsPala = sortedPala.map(item => item[0]);
             const dataPala = sortedPala.map(item => item[1]);
 
-            // 3. Consumo
+            // 3. Consumo (FILTRADO POR N68 y X68/EX68)
             const statsConsumo = {};
             dataConsumo.forEach(d => {
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -455,6 +457,10 @@
                 if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
+                
+                // NUEVO FILTRO PARA CONSUMO (Solo N68 y X68 / EX68)
+                const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
+                if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return;
                 
                 const xKey = getXKey(fechaBase, dimTiempo);
                 if (!xKey) return;
@@ -489,7 +495,7 @@
                     return statsComponentesTiempo[l] && statsComponentesTiempo[l][cod] ? statsComponentesTiempo[l][cod] : 0;
                 });
                 cilindrosDatasets.push({
-                    label: cod, // LEYENDA ACTUALIZADA A COD COMP
+                    label: cod,
                     data: dataParaCod,
                     backgroundColor: coloresComponentes[colorIdx % coloresComponentes.length]
                 });
