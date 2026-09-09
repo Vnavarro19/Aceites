@@ -21,8 +21,8 @@
         <!-- Encabezado con Logo -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
             <div class="flex items-center gap-4">
-                <!-- LOGO CHM MINERIA -->
-                <div class="bg-white p-1 rounded border-2 border-gray-200 shadow-sm flex items-center justify-center">
+                <!-- LOGO CHM MINERIA (Fondo Negro) -->
+                <div class="bg-black p-2 rounded shadow-sm flex items-center justify-center">
                     <img src="https://www.chmmineria.com.co/fileadmin/chmmineria/img/logo.png" alt="CHM Minería" class="h-12 w-auto object-contain">
                 </div>
                 <div>
@@ -49,10 +49,11 @@
                     <option value="Todas">Todas</option>
                 </select>
             </div>
-            <div class="flex flex-col w-32">
-                <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo</label>
-                <select id="equipoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="Todos">Todos</option>
+            <!-- FILTRO DE EQUIPO MÚLTIPLE -->
+            <div class="flex flex-col w-40">
+                <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo (Ctrl+Click)</label>
+                <select id="equipoFilter" multiple size="3" class="border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-y-auto">
+                    <option value="Todos" selected>Todos</option>
                 </select>
             </div>
             <div class="flex flex-col w-32">
@@ -107,10 +108,10 @@
                         <div class="relative w-full h-72"><canvas id="isoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
-                    <!-- Gráfico 3: Consumo de Aceite (AHORA DESGLOSADO POR EQUIPO) -->
+                    <!-- Gráfico 3: Consumo de Aceite (AHORA GRÁFICO DE LÍNEAS POR EQUIPO) -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite (N68 / X68)</h3>
-                        <p class="text-[10px] text-gray-400 mb-2">Click en un Equipo (color) para ver despachos</p>
+                        <p class="text-[10px] text-gray-400 mb-2">Click en un Equipo (línea) para ver despachos</p>
                         <div class="relative w-full h-72"><canvas id="consumoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
@@ -284,7 +285,16 @@
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
-        // Eventos Generales
+        // Obtener equipos seleccionados en el select múltiple
+        function getEquiposSeleccionados() {
+            const select = document.getElementById('equipoFilter');
+            const options = Array.from(select.selectedOptions).map(o => o.value);
+            return {
+                valores: options,
+                esTodos: options.length === 0 || options.includes('Todos')
+            };
+        }
+
         function generarEventoTiempo(origenDatos, nombreColumnas, nombreGrafico) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -293,8 +303,8 @@
                     
                     const yearSel = document.getElementById('yearFilter').value;
                     const flotaSel = document.getElementById('flotaFilter').value;
-                    const equipoSel = document.getElementById('equipoFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
+                    const eqFilter = getEquiposSeleccionados();
 
                     let baseDatos = [];
                     if (origenDatos === 'Trakka') baseDatos = dataTrakka;
@@ -307,7 +317,8 @@
                         
                         if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
-                        if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return false;
+                        
+                        if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
 
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
                     });
@@ -317,7 +328,6 @@
             };
         }
 
-        // Evento Específico para Consumo (por Equipo)
         function generarEventoConsumo(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -329,8 +339,8 @@
                     
                     const yearSel = document.getElementById('yearFilter').value;
                     const flotaSel = document.getElementById('flotaFilter').value;
-                    const equipoSel = document.getElementById('equipoFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
+                    const eqFilter = getEquiposSeleccionados();
 
                     const datosFiltrados = dataConsumo.filter(d => {
                         const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -340,7 +350,7 @@
                         
                         if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
-                        if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return false;
+                        if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return false;
                         
                         const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
                         if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return false;
@@ -356,7 +366,6 @@
             };
         }
 
-        // Evento Específico para Cilindros (por Cod Comp)
         function generarEventoCilindros(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -368,8 +377,8 @@
                     
                     const yearSel = document.getElementById('yearFilter').value;
                     const flotaSel = document.getElementById('flotaFilter').value;
-                    const equipoSel = document.getElementById('equipoFilter').value;
                     const dimTiempo = document.getElementById('timeDimension').value;
+                    const eqFilter = getEquiposSeleccionados();
 
                     const datosFiltrados = dataComponentes.filter(d => {
                         const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -379,7 +388,7 @@
                         
                         if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return false;
                         if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return false;
-                        if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return false;
+                        if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
                         
                         const codexSel = document.getElementById('codexFilter').value;
                         if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
@@ -398,7 +407,7 @@
         function procesarYDibujarTodo() {
             const yearSel = document.getElementById('yearFilter').value;
             const flotaSel = document.getElementById('flotaFilter').value;
-            const equipoSel = document.getElementById('equipoFilter').value;
+            const eqFilter = getEquiposSeleccionados();
             const codexSel = document.getElementById('codexFilter').value;
             const codCompSel = document.getElementById('codCompFilter').value;
             const dimTiempo = document.getElementById('timeDimension').value;
@@ -410,7 +419,7 @@
                 if (!parsedDate) return;
                 if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
-                if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
+                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return;
                 
                 const xKey = getXKey(d['Fecha Calculada'], dimTiempo);
                 if (!xKey) return;
@@ -440,7 +449,7 @@
                 if (!parsedDate) return;
                 if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return;
-                if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return;
+                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return;
                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return;
                 
                 const codComp = (d['Cod Comp'] || '').trim();
@@ -484,7 +493,7 @@
                 if (!parsedDate) return;
                 if (yearSel !== 'Todos' && parsedDate.año !== yearSel) return;
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
-                if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
+                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return;
                 
                 const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
                 if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return;
@@ -535,7 +544,7 @@
                 colorIdx++;
             });
 
-            // DATASETS CONSUMO
+            // DATASETS CONSUMO (LÍNEAS)
             const consumoDatasets = [];
             let colorIdxConsumo = 0;
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
@@ -545,7 +554,10 @@
                 consumoDatasets.push({
                     label: eq,
                     data: dataParaEq,
-                    backgroundColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length]
+                    borderColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length],
+                    backgroundColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length],
+                    tension: 0.2,
+                    fill: false
                 });
                 colorIdxConsumo++;
             });
@@ -572,12 +584,15 @@
                         if (elements.length > 0) {
                             const equipoPalaSelec = chart.data.labels[elements[0].index];
                             const yearSel = document.getElementById('yearFilter').value;
+                            const eqFilter = getEquiposSeleccionados();
                             
                             const datosFiltrados = dataComponentes.filter(d => {
                                 const ep = (d['Equipo'] || d['Equipo/EGI'] || '').trim();
                                 if (ep !== equipoPalaSelec) return false;
+                                
                                 const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
                                 if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
+                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
                                 
                                 const codexSel = document.getElementById('codexFilter').value;
                                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
@@ -648,11 +663,14 @@
 
             if (charts.consumo) charts.consumo.destroy();
             charts.consumo = new Chart(document.getElementById('consumoChart'), {
-                type: 'bar',
+                type: 'line', // VUELVE A SER GRÁFICO DE LÍNEAS
                 data: { labels: labelsTiempo, datasets: consumoDatasets },
                 options: { 
                     responsive: true, maintainAspectRatio: false,
-                    scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Galones' } } },
+                    scales: { 
+                        x: { stacked: false }, 
+                        y: { stacked: false, title: { display: true, text: 'Galones' } } 
+                    },
                     plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
                     onClick: generarEventoConsumo(['Equipo', 'Fecha Calculada', 'Despachado', 'Valor', 'Item Desc'])
                 }
@@ -683,6 +701,7 @@
                         if (elements.length > 0) {
                             const codCompSeleccionado = chart.data.labels[elements[0].index];
                             const yearSel = document.getElementById('yearFilter').value;
+                            const eqFilter = getEquiposSeleccionados();
                             
                             const datosFiltrados = dataComponentes.filter(d => {
                                 if ((d['Cod Comp'] || '').trim() !== codCompSeleccionado) return false;
@@ -690,11 +709,10 @@
                                 if (yearSel !== 'Todos' && parsedDate?.año !== yearSel) return false;
                                 
                                 const flotaSel = document.getElementById('flotaFilter').value;
-                                const equipoSel = document.getElementById('equipoFilter').value;
-                                const codexSel = document.getElementById('codexFilter').value;
-                                
                                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
-                                if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return false;
+                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
+                                
+                                const codexSel = document.getElementById('codexFilter').value;
                                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
                                 return true;
                             });
