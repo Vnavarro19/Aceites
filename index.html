@@ -58,7 +58,7 @@
                     <option value="Todos">Todos</option>
                 </select>
             </div>
-            <!-- NUEVO: Filtro de Cod Comp -->
+            <!-- Filtro de Cod Comp -->
             <div class="flex flex-col w-40">
                 <label for="codCompFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Cod Comp</label>
                 <select id="codCompFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -94,7 +94,7 @@
                     <!-- Gráfico 1: Cilindros y Bombas -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Cambio de Cilindros y Bombas</h3>
-                        <p class="text-[10px] text-gray-400 mb-2">Click en un color para ver su detalle</p>
+                        <p class="text-[10px] text-gray-400 mb-2">Click en un color (Cod Comp) para ver su detalle</p>
                         <div class="relative w-full h-72"><canvas id="cilindrosChart" class="cursor-pointer"></canvas></div>
                     </div>
 
@@ -156,7 +156,8 @@
 
         const coloresComponentes = [
             '#1e3a8a', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
-            '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#84cc16'
+            '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#84cc16',
+            '#0f172a', '#4338ca', '#be123c', '#ca8a04', '#047857'
         ];
 
         function fetchCSV(url) {
@@ -253,8 +254,6 @@
             return `${parsed.año}-${parsed.mes}`;
         }
 
-        // Se mantiene para dar un desglose ordenado en la barra apilada.
-        // Si no coincide con ninguno, retorna el nombre original para no ocultar datos.
         function agruparComponentePrincipal(tipoRaw) {
             const tipo = tipoRaw.toUpperCase();
             if (tipo.includes('BOMBA -7') || tipo.includes('BOMBAS -7')) return 'BOMBAS -7';
@@ -332,7 +331,9 @@
                     const idx = elements[0].index;
                     const datasetIdx = elements[0].datasetIndex;
                     const etiquetaSeleccionada = chart.data.labels[idx];
-                    const componenteSeleccionado = chart.data.datasets[datasetIdx].label; 
+                    
+                    // AHORA el nombre del componente clickeado es el Cod Comp
+                    const codCompSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
                     const yearSel = document.getElementById('yearFilter').value;
                     const flotaSel = document.getElementById('flotaFilter').value;
@@ -352,17 +353,14 @@
                         const codexSel = document.getElementById('codexFilter').value;
                         if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
                         
-                        const codCompSel = document.getElementById('codCompFilter').value;
                         const codComp = (d['Cod Comp'] || '').trim();
-                        if (codCompSel !== 'Todos' && codComp !== codCompSel) return false;
-
-                        const tipo = agruparComponentePrincipal(d['Tipo De Componente'] || '');
-                        if (tipo !== componenteSeleccionado) return false; 
+                        // Filtrar exclusivamente por el Cod Comp clickeado en la leyenda
+                        if (codComp !== codCompSeleccionado) return false; 
 
                         return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
                     });
 
-                    abrirModalDatos(`Componentes: ${componenteSeleccionado} (${etiquetaSeleccionada})`, nombreColumnas, datosFiltrados);
+                    abrirModalDatos(`Cod Comp Removidos: ${codCompSeleccionado} (${etiquetaSeleccionada})`, nombreColumnas, datosFiltrados);
                 }
             };
         }
@@ -402,7 +400,7 @@
 
             // 2. Componentes
             const statsComponentesTiempo = {}; 
-            const tiposComponentesActivos = new Set();
+            const codCompsActivos = new Set(); // Para la leyenda del grafico de barras
             const statsBoxplot = {};
             const statsPala = {}; 
 
@@ -416,7 +414,7 @@
                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return;
                 
                 const codComp = (d['Cod Comp'] || '').trim();
-                if (codCompSel !== 'Todos' && codComp !== codCompSel) return; // NUEVO FILTRO APLICADO
+                if (codCompSel !== 'Todos' && codComp !== codCompSel) return;
                 
                 const tipoRaw = (d['Tipo De Componente'] || '').trim();
                 const equipoPala = (d['Equipo'] || d['Equipo/EGI'] || 'Sin Equipo').trim();
@@ -424,23 +422,23 @@
                 if (!tipoRaw) return;
                 const categoriaPrincipal = agruparComponentePrincipal(tipoRaw);
 
-                if (categoriaPrincipal) {
+                // Si es un componente válido y tiene Cod Comp
+                if (categoriaPrincipal && codComp) {
                     if (!statsPala[equipoPala]) statsPala[equipoPala] = 0;
                     statsPala[equipoPala]++;
 
                     const xKey = getXKey(fechaBase, dimTiempo);
                     if (xKey) {
                         if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = {};
-                        if (!statsComponentesTiempo[xKey][categoriaPrincipal]) statsComponentesTiempo[xKey][categoriaPrincipal] = 0;
-                        statsComponentesTiempo[xKey][categoriaPrincipal]++;
-                        tiposComponentesActivos.add(categoriaPrincipal);
+                        // AHORA agrupamos por Cod Comp en lugar de Categoría Principal
+                        if (!statsComponentesTiempo[xKey][codComp]) statsComponentesTiempo[xKey][codComp] = 0;
+                        statsComponentesTiempo[xKey][codComp]++;
+                        codCompsActivos.add(codComp);
                     }
                     
-                    if (codComp) {
-                        if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
-                        const horas = num(d['Horas del Comp. en la posición']);
-                        if (horas > 0) statsBoxplot[codComp].push(horas);
-                    }
+                    if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
+                    const horas = num(d['Horas del Comp. en la posición']);
+                    if (horas > 0) statsBoxplot[codComp].push(horas);
                 }
             });
 
@@ -486,13 +484,13 @@
 
             const cilindrosDatasets = [];
             let colorIdx = 0;
-            Array.from(tiposComponentesActivos).sort().forEach(tipo => {
-                const dataParaTipo = labelsTiempo.map(l => {
-                    return statsComponentesTiempo[l] && statsComponentesTiempo[l][tipo] ? statsComponentesTiempo[l][tipo] : 0;
+            Array.from(codCompsActivos).sort().forEach(cod => {
+                const dataParaCod = labelsTiempo.map(l => {
+                    return statsComponentesTiempo[l] && statsComponentesTiempo[l][cod] ? statsComponentesTiempo[l][cod] : 0;
                 });
                 cilindrosDatasets.push({
-                    label: tipo,
-                    data: dataParaTipo,
+                    label: cod, // LEYENDA ACTUALIZADA A COD COMP
+                    data: dataParaCod,
                     backgroundColor: coloresComponentes[colorIdx % coloresComponentes.length]
                 });
                 colorIdx++;
