@@ -9,19 +9,23 @@
     <!-- Librerías de Gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.3.0/build/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     
     <!-- PapaParse para leer CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-gray-100 p-4 md:p-6 font-sans text-gray-800">
 
-    <div class="max-w-screen-2xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-xl border-t-4 border-blue-600">
+    <div class="max-w-[1600px] mx-auto bg-white p-6 md:p-8 rounded-lg shadow-xl border-t-4 border-blue-900">
         
         <!-- Encabezado -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-800 uppercase tracking-wide">Análisis de Aceite 2020-2026</h1>
-                <h2 class="text-lg text-gray-500 font-semibold mt-1">Tablero de Control - Minería</h2>
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-900 text-white p-3 rounded font-bold text-xl">CHM minería</div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800 uppercase tracking-wide">Análisis de Aceite 2020-2026</h1>
+                    <h2 class="text-md text-gray-500 font-semibold mt-1">Tablero de Control</h2>
+                </div>
             </div>
             <div id="estadoCarga" class="text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded">
                 Cargando bases de datos...
@@ -29,39 +33,33 @@
         </div>
 
         <!-- Barra de Filtros -->
-        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-8 bg-gray-50 p-5 rounded-md border border-gray-200 shadow-sm items-start">
-            
+        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
             <div class="flex flex-col w-36">
                 <label for="flotaFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Flota</label>
                 <select id="flotaFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todas">Todas</option>
                 </select>
             </div>
-
             <div class="flex flex-col w-36">
                 <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo</label>
                 <select id="equipoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
                 </select>
             </div>
-
             <div class="flex flex-col w-36">
                 <label for="codexFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Filtro Codex</label>
                 <select id="codexFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Todos">Todos</option>
                 </select>
             </div>
-
             <div class="flex flex-col w-48">
-                <label for="timeDimension" class="text-xs font-bold text-gray-600 uppercase mb-1">Eje X (Fecha Calculada)</label>
+                <label for="timeDimension" class="text-xs font-bold text-gray-600 uppercase mb-1">Eje X (Fechas)</label>
                 <select id="timeDimension" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="year">Año</option>
                     <option value="month">Mes</option>
                     <option value="year-month" selected>Año - Mes</option>
                 </select>
             </div>
-
-            <!-- NUEVO: Filtro de Componentes Principales -->
             <div class="flex flex-col w-56">
                 <label for="compFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Componente Principal</label>
                 <select id="compFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -79,48 +77,63 @@
                     <option value="BOMBAS GENERAL">BOMBAS GENERAL</option>
                 </select>
             </div>
-
         </div>
 
-        <!-- Contenedor de Gráficos -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Contenedor Principal (Layout de 2 Columnas) -->
+        <div class="flex flex-col xl:flex-row gap-6">
             
-            <!-- Gráfico 1: Desgaste -->
-            <div class="border rounded-lg p-4 bg-white shadow-sm">
-                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Revisión de Desgaste Promedio ppm (Metales)</h3>
-                <div class="relative w-full h-72"><canvas id="desgasteChart"></canvas></div>
+            <!-- Columna Izquierda: Gráfico de Palas -->
+            <div class="w-full xl:w-1/4 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
+                <h3 class="text-md font-bold text-gray-700 mb-4">Componentes Hidráulicos cambiados por Pala</h3>
+                <div class="relative w-full flex-grow" style="min-height: 500px;">
+                    <canvas id="palaChart"></canvas>
+                </div>
             </div>
 
-            <!-- Gráfico 2: Códigos ISO -->
-            <div class="border rounded-lg p-4 bg-white shadow-sm">
-                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Códigos ISO</h3>
-                <div class="relative w-full h-72"><canvas id="isoChart"></canvas></div>
-            </div>
+            <!-- Columna Derecha: Resto de los gráficos -->
+            <div class="w-full xl:w-3/4 flex flex-col gap-6">
+                
+                <!-- Grid 2x2 para gráficos superiores -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Gráfico 1: Cilindros y Bombas -->
+                    <div class="border rounded-lg p-4 bg-white shadow-sm">
+                        <h3 class="text-md font-bold text-gray-700 mb-2">Cambio de Cilindros y Bombas Hidráulicas</h3>
+                        <div class="relative w-full h-72"><canvas id="cilindrosChart"></canvas></div>
+                    </div>
 
-            <!-- Gráfico 3: Consumo de Aceite -->
-            <div class="border rounded-lg p-4 bg-white shadow-sm">
-                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Consumo de Aceite</h3>
-                <div class="relative w-full h-72"><canvas id="consumoChart"></canvas></div>
-            </div>
+                    <!-- Gráfico 2: Códigos ISO (Con Límites) -->
+                    <div class="border rounded-lg p-4 bg-white shadow-sm">
+                        <h3 class="text-md font-bold text-gray-700 mb-2">Códigos ISO</h3>
+                        <div class="relative w-full h-72"><canvas id="isoChart"></canvas></div>
+                    </div>
 
-            <!-- Gráfico 4: Cilindros y Bombas -->
-            <div class="border rounded-lg p-4 bg-white shadow-sm">
-                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Cambios del Componente Seleccionado</h3>
-                <div class="relative w-full h-72"><canvas id="cilindrosChart"></canvas></div>
-            </div>
+                    <!-- Gráfico 3: Consumo de Aceite -->
+                    <div class="border rounded-lg p-4 bg-white shadow-sm">
+                        <h3 class="text-md font-bold text-gray-700 mb-2">Consumo de Aceite de Toda la Flota</h3>
+                        <div class="relative w-full h-72"><canvas id="consumoChart"></canvas></div>
+                    </div>
 
-            <!-- Gráfico 5: Boxplot de Horas -->
-            <div class="border rounded-lg p-4 bg-white shadow-sm col-span-1 lg:col-span-2">
-                <h3 class="text-md font-bold text-gray-700 mb-2 text-center">Distribución de Horas por Componentes Principales (Boxplot)</h3>
-                <div class="relative w-full h-96"><canvas id="boxplotChart"></canvas></div>
-            </div>
+                    <!-- Gráfico 4: Desgaste -->
+                    <div class="border rounded-lg p-4 bg-white shadow-sm">
+                        <h3 class="text-md font-bold text-gray-700 mb-2">Revisión de Desgaste promedio ppm (Metales)</h3>
+                        <div class="relative w-full h-72"><canvas id="desgasteChart"></canvas></div>
+                    </div>
+                </div>
 
+                <!-- Boxplot inferior -->
+                <div class="border rounded-lg p-4 bg-white shadow-sm w-full">
+                    <h3 class="text-md font-bold text-gray-700 mb-2">Distribución de Horas por Cod Comp (Boxplot)</h3>
+                    <div class="relative w-full h-80"><canvas id="boxplotChart"></canvas></div>
+                </div>
+
+            </div>
         </div>
+
     </div>
 
     <script>
         let dataTrakka = [], dataComponentes = [], dataConsumo = [];
-        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null };
+        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null, pala: null };
 
         function fetchCSV(url) {
             return new Promise((resolve, reject) => {
@@ -140,7 +153,7 @@
             ]).then(([trakka, componentes, consumo]) => {
                 dataTrakka = trakka; dataComponentes = componentes; dataConsumo = consumo;
                 
-                document.getElementById('estadoCarga').textContent = "Datos cargados correctamente ✓";
+                document.getElementById('estadoCarga').textContent = "Datos cargados ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-green-600 bg-green-50 p-2 rounded";
                 document.getElementById('filtrosContainer').classList.remove('hidden');
                 document.getElementById('filtrosContainer').classList.add('flex');
@@ -148,19 +161,17 @@
                 inicializarFiltros();
                 procesarYDibujarTodo();
             }).catch(err => {
-                document.getElementById('estadoCarga').textContent = "Error al cargar CSVs.";
+                document.getElementById('estadoCarga').textContent = "Error cargando datos.";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-red-600 bg-red-50 p-2 rounded";
             });
         };
 
         function inicializarFiltros() {
             const flotas = new Set(), equipos = new Set(), codexSet = new Set();
-            
             dataTrakka.forEach(row => {
                 if (row['Flota']) flotas.add(row['Flota'].trim());
                 if (row['Equipo']) equipos.add(row['Equipo'].trim());
             });
-
             dataComponentes.forEach(row => {
                 if (row['Codex']) codexSet.add(row['Codex'].trim());
             });
@@ -227,7 +238,7 @@
             const dimTiempo = document.getElementById('timeDimension').value;
             const compSel = document.getElementById('compFilter').value;
 
-            // TRAKKA
+            // 1. Procesar TRAKKA
             const statsTrakka = {};
             dataTrakka.forEach(d => {
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
@@ -248,41 +259,54 @@
                 statsTrakka[xKey].count++;
             });
 
-            // COMPONENTES
+            // 2. Procesar COMPONENTES
             const statsComponentesTiempo = {};
             const statsBoxplot = {};
+            const statsPala = {}; // Nuevo agrupamiento para barra lateral
 
             dataComponentes.forEach(d => {
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return;
-                if (equipoSel !== 'Todos' && d['Equipo'] !== equipoSel) return;
+                if (equipoSel !== 'Todos' && (d['Equipo'] !== equipoSel && d['Equipo/EGI'] !== equipoSel)) return;
                 if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return;
                 
                 const tipoRaw = (d['Tipo De Componente'] || '').trim();
-                if (!tipoRaw) return;
+                const equipoPala = (d['Equipo'] || d['Equipo/EGI'] || 'Sin Equipo').trim();
+                const codComp = (d['Cod Comp'] || '').trim();
 
+                if (!tipoRaw) return;
                 const categoriaPrincipal = agruparComponentePrincipal(tipoRaw);
-                
+
+                // Conteo para gráfico de Pala (izquierda) - Todos los de la consulta actual
+                if (!statsPala[equipoPala]) statsPala[equipoPala] = 0;
+                statsPala[equipoPala]++;
+
                 if (categoriaPrincipal) {
-                    // Aplicar el nuevo filtro desplegable
                     if (compSel !== 'Todos' && categoriaPrincipal !== compSel) return;
 
-                    // 1. Agrupar para el gráfico de barras por tiempo
+                    // Agrupar para el gráfico de barras por tiempo (Cilindros)
                     const xKey = getXKey(d['Fecha Calculada'] || d['Fecha'], dimTiempo);
                     if (xKey) {
                         if (!statsComponentesTiempo[xKey]) statsComponentesTiempo[xKey] = 0;
                         statsComponentesTiempo[xKey]++;
                     }
 
-                    // 2. Agrupar para el Boxplot
-                    if (!statsBoxplot[categoriaPrincipal]) statsBoxplot[categoriaPrincipal] = [];
-                    const horas = num(d['Horas del Comp. en la posición']);
-                    if (horas > 0) {
-                        statsBoxplot[categoriaPrincipal].push(horas);
+                    // Agrupar para el Boxplot (Eje X = Cod Comp)
+                    if (codComp) {
+                        if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
+                        const horas = num(d['Horas del Comp. en la posición']);
+                        if (horas > 0) {
+                            statsBoxplot[codComp].push(horas);
+                        }
                     }
                 }
             });
 
-            // CONSUMO
+            // Ordenar datos de Pala de mayor a menor
+            const sortedPala = Object.entries(statsPala).sort((a, b) => b[1] - a[1]);
+            const labelsPala = sortedPala.map(item => item[0]);
+            const dataPala = sortedPala.map(item => item[1]);
+
+            // 3. Procesar CONSUMO
             const statsConsumo = {};
             dataConsumo.forEach(d => {
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
@@ -318,57 +342,101 @@
                 dConsumo.push(statsConsumo[l] || 0);
             });
 
-            // UNIFICAR ETIQUETAS DE BOXPLOT
+            // UNIFICAR ETIQUETAS DE BOXPLOT (Eje X = Cod Comp)
             const labelsBoxplot = Object.keys(statsBoxplot).sort();
-            const dataBoxplot = labelsBoxplot.map(tipo => statsBoxplot[tipo]);
+            const dataBoxplot = labelsBoxplot.map(cod => statsBoxplot[cod]);
 
-            dibujarGraficos(labelsTiempo, {dHierro, dCobre, dPlomo, dCromo, dAlum}, {dIso4, dIso6, dIso14}, dCilindros, dConsumo, labelsBoxplot, dataBoxplot);
+            dibujarGraficos(
+                labelsTiempo, {dHierro, dCobre, dPlomo, dCromo, dAlum}, {dIso4, dIso6, dIso14}, 
+                dCilindros, dConsumo, labelsBoxplot, dataBoxplot, labelsPala, dataPala
+            );
         }
 
-        function dibujarGraficos(labelsTiempo, tk, iso, cilindros, consumo, labelsBoxplot, dataBoxplot) {
+        function dibujarGraficos(labelsTiempo, tk, iso, cilindros, consumo, labelsBoxplot, dataBoxplot, labelsPala, dataPala) {
             const chartOpts = { responsive: true, maintainAspectRatio: false };
             
+            // Gráfico lateral (Palas)
+            if (charts.pala) charts.pala.destroy();
+            charts.pala = new Chart(document.getElementById('palaChart'), {
+                type: 'bar',
+                data: {
+                    labels: labelsPala,
+                    datasets: [{
+                        label: 'Componentes Removidos',
+                        data: dataPala,
+                        backgroundColor: '#1e3a8a', // Azul oscuro CHM
+                        borderRadius: 3
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'Cantidad' } },
+                        y: { title: { display: true, text: 'Equipo' } }
+                    }
+                }
+            });
+
             // 1. Desgaste
             if (charts.desgaste) charts.desgaste.destroy();
             charts.desgaste = new Chart(document.getElementById('desgasteChart'), {
                 type: 'line',
                 data: { labels: labelsTiempo, datasets: [
-                    { label: 'Hierro', data: tk.dHierro, borderColor: '#1f2937', tension: 0.2 },
-                    { label: 'Cobre', data: tk.dCobre, borderColor: '#9ca3af', tension: 0.2 },
-                    { label: 'Plomo', data: tk.dPlomo, borderColor: '#fbbf24', tension: 0.2 }
+                    { label: 'Hierro', data: tk.dHierro, borderColor: '#ef4444', tension: 0.2 },
+                    { label: 'Cobre', data: tk.dCobre, borderColor: '#10b981', tension: 0.2 },
+                    { label: 'Aluminio', data: tk.dAlum, borderColor: '#f59e0b', tension: 0.2 },
+                    { label: 'Silicio', data: tk.dPlomo, borderColor: '#6b7280', tension: 0.2 }
                 ]}, options: chartOpts
             });
 
-            // 2. ISO
+            // 2. ISO con Límites
             if (charts.iso) charts.iso.destroy();
             charts.iso = new Chart(document.getElementById('isoChart'), {
                 type: 'line',
                 data: { labels: labelsTiempo, datasets: [
                     { label: 'ISO > 04µ', data: iso.dIso4, borderColor: '#3b82f6', tension: 0.2 },
-                    { label: 'ISO > 06µ', data: iso.dIso6, borderColor: '#10b981', tension: 0.2 },
+                    { label: 'ISO > 06µ', data: iso.dIso6, borderColor: '#f97316', tension: 0.2 },
                     { label: 'ISO > 14µ', data: iso.dIso14, borderColor: '#ef4444', tension: 0.2 }
-                ]}, options: chartOpts
+                ]}, 
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                c4: { type: 'line', yMin: 25, yMax: 25, borderColor: '#2563eb', borderWidth: 2, borderDash: [4,4], label: { content: 'Critical 4', display: true, position: 'start', backgroundColor: '#2563eb', font: {size: 10} } },
+                                w4: { type: 'line', yMin: 23, yMax: 23, borderColor: '#93c5fd', borderWidth: 2, borderDash: [4,4], label: { content: 'Warning 4', display: true, position: 'start', backgroundColor: '#93c5fd', color: '#1e3a8a', font: {size: 10} } },
+                                c6: { type: 'line', yMin: 22, yMax: 22, borderColor: '#ea580c', borderWidth: 2, borderDash: [4,4], label: { content: 'Critical 6', display: true, position: 'start', backgroundColor: '#ea580c', font: {size: 10} } },
+                                w6: { type: 'line', yMin: 20, yMax: 20, borderColor: '#fdba74', borderWidth: 2, borderDash: [4,4], label: { content: 'Warning 6', display: true, position: 'start', backgroundColor: '#fdba74', color: '#7c2d12', font: {size: 10} } },
+                                c14: { type: 'line', yMin: 18, yMax: 18, borderColor: '#dc2626', borderWidth: 2, borderDash: [4,4], label: { content: 'Critical 14', display: true, position: 'start', backgroundColor: '#dc2626', font: {size: 10} } },
+                                w14: { type: 'line', yMin: 16, yMax: 16, borderColor: '#fca5a5', borderWidth: 2, borderDash: [4,4], label: { content: 'Warning 14', display: true, position: 'start', backgroundColor: '#fca5a5', color: '#7f1d1d', font: {size: 10} } }
+                            }
+                        }
+                    }
+                }
             });
 
             // 3. Consumo
             if (charts.consumo) charts.consumo.destroy();
             charts.consumo = new Chart(document.getElementById('consumoChart'), {
-                type: 'bar',
+                type: 'line',
                 data: { labels: labelsTiempo, datasets: [
-                    { label: 'Consumo (Galones/Despacho)', data: consumo, backgroundColor: '#6366f1' }
+                    { label: 'Consumo (Galones)', data: consumo, borderColor: '#1e3a8a', backgroundColor: '#1e3a8a', tension: 0.2, fill: true, backgroundColor: 'rgba(30, 58, 138, 0.1)' }
                 ]}, options: chartOpts
             });
 
-            // 4. Componentes Removidos
+            // 4. Cilindros y Bombas
             if (charts.cilindros) charts.cilindros.destroy();
             charts.cilindros = new Chart(document.getElementById('cilindrosChart'), {
                 type: 'bar',
                 data: { labels: labelsTiempo, datasets: [
-                    { label: 'Cant. Componentes Removidos', data: cilindros, backgroundColor: '#f97316' }
+                    { label: 'Componentes Removidos', data: cilindros, backgroundColor: '#4b5563' }
                 ]}, options: chartOpts
             });
 
-            // 5. Boxplot
+            // 5. Boxplot (Eje X = Cod Comp)
             if (charts.boxplot) charts.boxplot.destroy();
             charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
                 type: 'boxplot',
@@ -388,8 +456,8 @@
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { 
-                            title: { display: true, text: 'Tipo de Componente' },
-                            ticks: { autoSkip: false, maxRotation: 45, minRotation: 45 }
+                            title: { display: true, text: 'Cod Comp' },
+                            ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 }
                         },
                         y: { title: { display: true, text: 'Horas en la posición' } }
                     }
