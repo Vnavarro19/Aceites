@@ -37,7 +37,6 @@
 
         <!-- Barra de Filtros -->
         <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
-            <!-- FILTRO DE AÑO MÚLTIPLE -->
             <div class="flex flex-col w-32">
                 <label for="yearFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Año (Ctrl+Click)</label>
                 <select id="yearFilter" multiple size="3" class="border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-y-auto">
@@ -50,7 +49,6 @@
                     <option value="Todas">Todas</option>
                 </select>
             </div>
-            <!-- FILTRO DE EQUIPO MÚLTIPLE -->
             <div class="flex flex-col w-40">
                 <label for="equipoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Equipo (Ctrl+Click)</label>
                 <select id="equipoFilter" multiple size="3" class="border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-y-auto">
@@ -109,10 +107,10 @@
                         <div class="relative w-full h-72"><canvas id="isoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
-                    <!-- Gráfico 3: Consumo de Aceite -->
+                    <!-- Gráfico 3: Consumo de Aceite (Líneas) -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite (N68 / X68)</h3>
-                        <p class="text-[10px] text-gray-400 mb-2">Click en un Equipo (línea) para ver despachos</p>
+                        <p class="text-[10px] text-gray-400 mb-2">Click en una línea para ver despachos de ese Equipo</p>
                         <div class="relative w-full h-72"><canvas id="consumoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
@@ -129,6 +127,13 @@
                     <h3 class="text-md font-bold text-gray-700 mb-1">Distribución de Horas por Cod Comp (Boxplot)</h3>
                     <p class="text-[10px] text-gray-400 mb-2">Click en una caja para ver listado de componentes</p>
                     <div class="relative w-full h-80"><canvas id="boxplotChart" class="cursor-pointer"></canvas></div>
+                </div>
+                
+                <!-- NUEVO: Gráfico de Dispersión (Scatter) -->
+                <div class="border rounded-lg p-4 bg-white shadow-sm w-full">
+                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite por Equipo</h3>
+                    <p class="text-[10px] text-gray-400 mb-2">Muestra puntos individuales de despacho. Click en un punto para ver su detalle exacto.</p>
+                    <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
                 </div>
 
             </div>
@@ -156,7 +161,7 @@
 
     <script>
         let dataTrakka = [], dataComponentes = [], dataConsumo = [];
-        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null, pala: null };
+        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null, pala: null, scatter: null };
 
         const coloresComponentes = [
             '#1e3a8a', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
@@ -286,27 +291,19 @@
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
-        // Obtener Años seleccionados en el select múltiple
         function getYearsSeleccionados() {
             const select = document.getElementById('yearFilter');
             const options = Array.from(select.selectedOptions).map(o => o.value);
-            return {
-                valores: options,
-                esTodos: options.length === 0 || options.includes('Todos')
-            };
+            return { valores: options, esTodos: options.length === 0 || options.includes('Todos') };
         }
 
-        // Obtener Equipos seleccionados en el select múltiple
         function getEquiposSeleccionados() {
             const select = document.getElementById('equipoFilter');
             const options = Array.from(select.selectedOptions).map(o => o.value);
-            return {
-                valores: options,
-                esTodos: options.length === 0 || options.includes('Todos')
-            };
+            return { valores: options, esTodos: options.length === 0 || options.includes('Todos') };
         }
 
-        // Eventos Generales
+        // Eventos OnClick
         function generarEventoTiempo(origenDatos, nombreColumnas, nombreGrafico) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
@@ -339,14 +336,12 @@
             };
         }
 
-        // Evento Específico para Consumo (por Equipo)
         function generarEventoConsumo(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const datasetIdx = elements[0].datasetIndex;
                     const etiquetaSeleccionada = chart.data.labels[idx];
-                    
                     const equipoSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
                     const yrFilter = getYearsSeleccionados();
@@ -378,14 +373,12 @@
             };
         }
 
-        // Evento Específico para Cilindros (por Cod Comp)
         function generarEventoCilindros(nombreColumnas) {
             return (e, elements, chart) => {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const datasetIdx = elements[0].datasetIndex;
                     const etiquetaSeleccionada = chart.data.labels[idx];
-                    
                     const codCompSeleccionado = chart.data.datasets[datasetIdx].label; 
                     
                     const yrFilter = getYearsSeleccionados();
@@ -498,9 +491,10 @@
             const labelsPala = sortedPala.map(item => item[0]);
             const dataPala = sortedPala.map(item => item[1]);
 
-            // 3. Consumo (DESGLOSE POR EQUIPO)
+            // 3. Consumo y Dispersión
             const statsConsumo = {};
             const equiposConsumoActivos = new Set();
+            const scatterDataPorEquipo = {};
             
             dataConsumo.forEach(d => {
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -515,15 +509,22 @@
                 if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return;
                 
                 const eqConsumo = (d['Equipo'] || 'Sin Equipo').trim();
-
                 const xKey = getXKey(fechaBase, dimTiempo);
                 if (!xKey) return;
                 
+                const galones = num(d['Despachado'] || d['Valor']);
+
+                // Agrupamiento para Líneas (Suma total)
                 if (!statsConsumo[xKey]) statsConsumo[xKey] = {};
                 if (!statsConsumo[xKey][eqConsumo]) statsConsumo[xKey][eqConsumo] = 0;
-                
-                statsConsumo[xKey][eqConsumo] += num(d['Despachado'] || d['Valor']);
+                statsConsumo[xKey][eqConsumo] += galones;
                 equiposConsumoActivos.add(eqConsumo);
+
+                // Agrupamiento para Dispersión (Puntos individuales)
+                if (galones > 0) {
+                    if (!scatterDataPorEquipo[eqConsumo]) scatterDataPorEquipo[eqConsumo] = [];
+                    scatterDataPorEquipo[eqConsumo].push({ x: xKey, y: galones });
+                }
             });
 
             // UNIFICAR ETIQUETAS DE TIEMPO
@@ -560,21 +561,37 @@
                 colorIdx++;
             });
 
-            // DATASETS CONSUMO (LÍNEAS)
+            // DATASETS CONSUMO (LÍNEAS) y SCATTER
             const consumoDatasets = [];
+            const scatterDatasets = [];
             let colorIdxConsumo = 0;
+            
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
+                const colorActual = coloresComponentes[colorIdxConsumo % coloresComponentes.length];
+                
+                // Líneas
                 const dataParaEq = labelsTiempo.map(l => {
                     return statsConsumo[l] && statsConsumo[l][eq] ? statsConsumo[l][eq] : 0;
                 });
                 consumoDatasets.push({
                     label: eq,
                     data: dataParaEq,
-                    borderColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length],
-                    backgroundColor: coloresComponentes[colorIdxConsumo % coloresComponentes.length],
+                    borderColor: colorActual,
+                    backgroundColor: colorActual,
                     tension: 0.2,
                     fill: false
                 });
+
+                // Scatter
+                scatterDatasets.push({
+                    label: eq,
+                    data: scatterDataPorEquipo[eq] || [],
+                    backgroundColor: colorActual,
+                    borderColor: colorActual,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                });
+
                 colorIdxConsumo++;
             });
 
@@ -583,11 +600,11 @@
 
             dibujarGraficos(
                 labelsTiempo, {dHierro, dCobre, dAlum, dSilicio}, {dIso4, dIso6, dIso14}, 
-                cilindrosDatasets, consumoDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala
+                cilindrosDatasets, consumoDatasets, scatterDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala
             );
         }
 
-        function dibujarGraficos(labelsTiempo, tk, iso, cilindrosDatasets, consumoDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala) {
+        function dibujarGraficos(labelsTiempo, tk, iso, cilindrosDatasets, consumoDatasets, scatterDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala) {
             
             if (charts.pala) charts.pala.destroy();
             charts.pala = new Chart(document.getElementById('palaChart'), {
@@ -733,6 +750,59 @@
                                 return true;
                             });
                             abrirModalDatos(`Listado de Horas para Cod Comp: ${codCompSeleccionado}`, ['Equipo/EGI', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición', 'Fecha Calculada'], datosFiltrados);
+                        }
+                    }
+                }
+            });
+
+            // NUEVO: Gráfico de Dispersión (Scatter)
+            if (charts.scatter) charts.scatter.destroy();
+            charts.scatter = new Chart(document.getElementById('scatterChart'), {
+                type: 'scatter',
+                data: { datasets: scatterDatasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'category', labels: labelsTiempo, title: { display: true, text: 'Fecha' } },
+                        y: { title: { display: true, text: 'Galones' } }
+                    },
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
+                    onClick: (e, elements, chart) => {
+                        if (elements.length > 0) {
+                            const datasetIdx = elements[0].datasetIndex;
+                            const idx = elements[0].index;
+                            const punto = chart.data.datasets[datasetIdx].data[idx];
+                            
+                            const etiquetaSeleccionada = punto.x;
+                            const galonesSeleccionados = punto.y;
+                            const equipoSeleccionado = chart.data.datasets[datasetIdx].label;
+                            
+                            const yrFilter = getYearsSeleccionados();
+                            const eqFilter = getEquiposSeleccionados();
+                            const flotaSel = document.getElementById('flotaFilter').value;
+                            const dimTiempo = document.getElementById('timeDimension').value;
+
+                            const datosFiltrados = dataConsumo.filter(d => {
+                                const fechaBase = d['Fecha Calculada'] || d['Fecha'];
+                                if (!fechaBase) return false;
+                                const parsedDate = parseFecha(fechaBase);
+                                if (!parsedDate) return false;
+                                
+                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
+                                if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
+                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return false;
+                                
+                                const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
+                                if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return false;
+
+                                const eq = (d['Equipo'] || 'Sin Equipo').trim();
+                                if (eq !== equipoSeleccionado) return false; 
+
+                                // Filtrar exactamente por la fecha y el valor puntual de galones (para identificar el despacho)
+                                return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada && num(d['Despachado'] || d['Valor']) === galonesSeleccionados;
+                            });
+
+                            abrirModalDatos(`Dispersión de Consumo: ${equipoSeleccionado} (${etiquetaSeleccionada} - ${galonesSeleccionados} Galones)`, ['Equipo', 'Fecha Calculada', 'Despachado', 'Valor', 'Item Desc'], datosFiltrados);
                         }
                     }
                 }
