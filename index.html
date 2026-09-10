@@ -117,20 +117,19 @@
                     </div>
                 </div>
 
+                <!-- Gráfico de Dispersión (Consumo de Aceite) con Anotaciones -->
+                <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
+                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite (Relleno vs Cambio)</h3>
+                    <p class="text-[10px] text-gray-400 mb-2">Líneas de referencia según el manual: 1060 Galones a las 2000, 2500 y 4000 horas. Click en un punto para ver detalle.</p>
+                    <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
+                </div>
+
                 <!-- Boxplot -->
                 <div class="border rounded-lg p-4 bg-white shadow-sm w-full">
                     <h3 class="text-md font-bold text-gray-700 mb-1">Distribución de Horas por Cod Comp (Boxplot)</h3>
                     <p class="text-[10px] text-gray-400 mb-2">Click en una caja para ver listado de componentes</p>
                     <div class="relative w-full h-80"><canvas id="boxplotChart" class="cursor-pointer"></canvas></div>
                 </div>
-                
-                <!-- Gráfico de Dispersión (Consumo de Aceite) con Anotaciones -->
-                <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
-                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite (Frecuencia vs Despachado)</h3>
-                    <p class="text-[10px] text-gray-400 mb-2">Líneas de referencia según el manual: 1060 Galones a las 2000, 2500 y 4000 horas. Click en un punto para ver su detalle exacto.</p>
-                    <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
-                </div>
-
             </div>
         </div>
     </div>
@@ -488,7 +487,10 @@
             // 3. Consumo y Dispersión
             const statsConsumo = {};
             const equiposConsumoActivos = new Set();
-            const scatterConsumoPorEquipo = {};
+            
+            // Scatter categorizado por Relleno (<=200) y Cambio (>200)
+            const scatterConsumoRelleno = [];
+            const scatterConsumoCambio = [];
             
             dataConsumo.forEach(d => {
                 const fechaBase = d['Fecha Calculada'] || d['Fecha'];
@@ -515,12 +517,11 @@
                 equiposConsumoActivos.add(eqConsumo);
 
                 if (galones > 0) {
-                    if (!scatterConsumoPorEquipo[eqConsumo]) scatterConsumoPorEquipo[eqConsumo] = [];
-                    scatterConsumoPorEquipo[eqConsumo].push({
-                        x: frecuencia,
-                        y: galones,
-                        raw: d
-                    });
+                    if (galones <= 200) {
+                        scatterConsumoRelleno.push({ x: frecuencia, y: galones, raw: d });
+                    } else {
+                        scatterConsumoCambio.push({ x: frecuencia, y: galones, raw: d });
+                    }
                 }
             });
 
@@ -557,14 +558,11 @@
                 colorIdx++;
             });
 
-            // DATASETS CONSUMO Y SCATTER
+            // DATASETS CONSUMO (LÍNEAS)
             const consumoDatasets = [];
-            const scatterDatasets = [];
             let colorIdxConsumo = 0;
-            
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
                 const colorActual = coloresComponentes[colorIdxConsumo % coloresComponentes.length];
-                
                 const dataParaEq = labelsTiempo.map(l => {
                     return statsConsumo[l] && statsConsumo[l][eq] ? statsConsumo[l][eq] : 0;
                 });
@@ -576,19 +574,28 @@
                     tension: 0.2,
                     fill: false
                 });
-
-                if (scatterConsumoPorEquipo[eq]) {
-                    scatterDatasets.push({
-                        label: eq,
-                        data: scatterConsumoPorEquipo[eq],
-                        backgroundColor: colorActual,
-                        borderColor: colorActual,
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    });
-                }
                 colorIdxConsumo++;
             });
+
+            // SCATTER DATASETS (Relleno y Cambio)
+            const scatterDatasets = [
+                {
+                    label: 'Relleno (<= 200 gal)',
+                    data: scatterConsumoRelleno,
+                    backgroundColor: '#60a5fa', // Azul claro
+                    borderColor: '#3b82f6',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Cambio de Aceite (> 200 gal)',
+                    data: scatterConsumoCambio,
+                    backgroundColor: '#1e3a8a', // Azul oscuro
+                    borderColor: '#1e3a8a',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }
+            ];
 
             const labelsBoxplot = Object.keys(statsBoxplot).sort();
             const dataBoxplot = labelsBoxplot.map(cod => statsBoxplot[cod]);
@@ -770,13 +777,18 @@
                         legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
                         annotation: {
                             annotations: {
-                                // Líneas Verticales de Horas
                                 lim2000: { type: 'line', xMin: 2000, xMax: 2000, borderColor: '#10b981', borderWidth: 2, borderDash: [5,5], label: { content: '2000 h', display: true, position: 'start', backgroundColor: '#10b981', font: {size: 10} } },
                                 lim2500: { type: 'line', xMin: 2500, xMax: 2500, borderColor: '#f59e0b', borderWidth: 2, borderDash: [5,5], label: { content: '2500 h', display: true, position: 'start', backgroundColor: '#f59e0b', font: {size: 10} } },
                                 lim4000: { type: 'line', xMin: 4000, xMax: 4000, borderColor: '#ef4444', borderWidth: 2, borderDash: [5,5], label: { content: '4000 h', display: true, position: 'start', backgroundColor: '#ef4444', font: {size: 10} } },
-                                
-                                // Línea Horizontal de Galones (Consumo)
                                 limGalones: { type: 'line', yMin: 1060, yMax: 1060, borderColor: '#3b82f6', borderWidth: 2, borderDash: [5,5], label: { content: '1060 Galones', display: true, position: 'end', backgroundColor: '#3b82f6', font: {size: 10} } }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const rawData = context.raw.raw;
+                                    return `Eq: ${rawData['Equipo']} | Frec: ${context.parsed.x} | Gal: ${context.parsed.y}`;
+                                }
                             }
                         }
                     },
@@ -787,9 +799,10 @@
                             
                             const punto = chart.data.datasets[datasetIdx].data[idx];
                             const filaExacta = punto.raw;
+                            const categoria = chart.data.datasets[datasetIdx].label;
                             
                             abrirModalDatos(
-                                `Detalle de Consumo: ${filaExacta['Equipo']} (Despachado: ${punto.y})`, 
+                                `Detalle de Evento (${categoria})`, 
                                 ['Equipo', 'Fecha Calculada', 'Despachado', 'Frecuencia', 'Item Desc'], 
                                 [filaExacta]
                             );
