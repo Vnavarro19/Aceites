@@ -124,10 +124,10 @@
                     <div class="relative w-full h-80"><canvas id="boxplotChart" class="cursor-pointer"></canvas></div>
                 </div>
                 
-                <!-- NUEVO: Gráfico de Dispersión (Consumo de Aceite) -->
+                <!-- Gráfico de Dispersión (Consumo de Aceite) con Anotaciones -->
                 <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
                     <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite (Frecuencia vs Despachado)</h3>
-                    <p class="text-[10px] text-gray-400 mb-2">Muestra despachos de N68 y X68 agrupados por equipo. Click en un punto para ver detalle.</p>
+                    <p class="text-[10px] text-gray-400 mb-2">Líneas de referencia según el manual: 1060 Galones a las 2000, 2500 y 4000 horas. Click en un punto para ver su detalle exacto.</p>
                     <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
                 </div>
 
@@ -367,6 +367,43 @@
             };
         }
 
+        function generarEventoCilindros(nombreColumnas) {
+            return (e, elements, chart) => {
+                if (elements.length > 0) {
+                    const idx = elements[0].index;
+                    const datasetIdx = elements[0].datasetIndex;
+                    const etiquetaSeleccionada = chart.data.labels[idx];
+                    const codCompSeleccionado = chart.data.datasets[datasetIdx].label; 
+                    
+                    const yrFilter = getYearsSeleccionados();
+                    const eqFilter = getEquiposSeleccionados();
+                    const flotaSel = document.getElementById('flotaFilter').value;
+                    const dimTiempo = document.getElementById('timeDimension').value;
+
+                    const datosFiltrados = dataComponentes.filter(d => {
+                        const fechaBase = d['Fecha Calculada'] || d['Fecha'];
+                        if (!fechaBase) return false;
+                        const parsedDate = parseFecha(fechaBase);
+                        if (!parsedDate) return false;
+                        
+                        if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
+                        if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return false;
+                        if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
+                        
+                        const codexSel = document.getElementById('codexFilter').value;
+                        if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
+                        
+                        const codComp = (d['Cod Comp'] || '').trim();
+                        if (codComp !== codCompSeleccionado) return false; 
+
+                        return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
+                    });
+
+                    abrirModalDatos(`Cod Comp Removidos: ${codCompSeleccionado} (${etiquetaSeleccionada})`, nombreColumnas, datosFiltrados);
+                }
+            };
+        }
+
         function procesarYDibujarTodo() {
             const yrFilter = getYearsSeleccionados();
             const eqFilter = getEquiposSeleccionados();
@@ -401,7 +438,7 @@
                 statsTrakka[xKey].count++;
             });
 
-            // 2. Componentes (Barras y Boxplot)
+            // 2. Componentes
             const statsComponentesTiempo = {}; 
             const codCompsActivos = new Set();
             const statsBoxplot = {};
@@ -438,11 +475,9 @@
                         codCompsActivos.add(codComp);
                     }
                     
+                    if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
                     const horas = num(d['Horas del Comp. en la posición']);
-                    if (horas > 0) {
-                        if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
-                        statsBoxplot[codComp].push(horas);
-                    }
+                    if (horas > 0) statsBoxplot[codComp].push(horas);
                 }
             });
 
@@ -450,7 +485,7 @@
             const labelsPala = sortedPala.map(item => item[0]);
             const dataPala = sortedPala.map(item => item[1]);
 
-            // 3. Consumo y Dispersión de Frecuencia
+            // 3. Consumo y Dispersión
             const statsConsumo = {};
             const equiposConsumoActivos = new Set();
             const scatterConsumoPorEquipo = {};
@@ -464,7 +499,6 @@
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return;
                 
-                // Filtro exclusivo N68 y X68
                 const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
                 if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return;
                 
@@ -473,15 +507,13 @@
                 if (!xKey) return;
                 
                 const galones = num(d['Despachado'] || d['Valor']);
-                const frecuencia = num(d['Frecuencia']); // NUEVO: Extraemos Frecuencia
+                const frecuencia = num(d['Frecuencia']); 
 
-                // Acumulado para Gráfico de Líneas
                 if (!statsConsumo[xKey]) statsConsumo[xKey] = {};
                 if (!statsConsumo[xKey][eqConsumo]) statsConsumo[xKey][eqConsumo] = 0;
                 statsConsumo[xKey][eqConsumo] += galones;
                 equiposConsumoActivos.add(eqConsumo);
 
-                // Puntos individuales para el Gráfico Scatter (Frecuencia vs Galones)
                 if (galones > 0) {
                     if (!scatterConsumoPorEquipo[eqConsumo]) scatterConsumoPorEquipo[eqConsumo] = [];
                     scatterConsumoPorEquipo[eqConsumo].push({
@@ -525,7 +557,7 @@
                 colorIdx++;
             });
 
-            // DATASETS CONSUMO (LÍNEAS) y SCATTER (FRECUENCIA VS CONSUMO)
+            // DATASETS CONSUMO Y SCATTER
             const consumoDatasets = [];
             const scatterDatasets = [];
             let colorIdxConsumo = 0;
@@ -533,7 +565,6 @@
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
                 const colorActual = coloresComponentes[colorIdxConsumo % coloresComponentes.length];
                 
-                // Líneas
                 const dataParaEq = labelsTiempo.map(l => {
                     return statsConsumo[l] && statsConsumo[l][eq] ? statsConsumo[l][eq] : 0;
                 });
@@ -546,7 +577,6 @@
                     fill: false
                 });
 
-                // Scatter (Frecuencia vs Despachado)
                 if (scatterConsumoPorEquipo[eq]) {
                     scatterDatasets.push({
                         label: eq,
@@ -682,40 +712,7 @@
                     responsive: true, maintainAspectRatio: false,
                     scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Cantidad' } } },
                     plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
-                    onClick: (e, elements, chart) => {
-                        if (elements.length > 0) {
-                            const datasetIdx = elements[0].datasetIndex;
-                            const idx = elements[0].index;
-                            const codCompSeleccionado = chart.data.datasets[datasetIdx].label; 
-                            const etiquetaSeleccionada = chart.data.labels[idx];
-                            
-                            const yrFilter = getYearsSeleccionados();
-                            const eqFilter = getEquiposSeleccionados();
-                            const flotaSel = document.getElementById('flotaFilter').value;
-                            const dimTiempo = document.getElementById('timeDimension').value;
-
-                            const datosFiltrados = dataComponentes.filter(d => {
-                                const fechaBase = d['Fecha Calculada'] || d['Fecha'];
-                                if (!fechaBase) return false;
-                                const parsedDate = parseFecha(fechaBase);
-                                if (!parsedDate) return false;
-                                
-                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
-                                if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel && d['Equipo/EGI'] !== flotaSel) return false;
-                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
-                                
-                                const codexSel = document.getElementById('codexFilter').value;
-                                if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
-                                
-                                const codComp = (d['Cod Comp'] || '').trim();
-                                if (codComp !== codCompSeleccionado) return false; 
-
-                                return getXKey(fechaBase, dimTiempo) === etiquetaSeleccionada;
-                            });
-
-                            abrirModalDatos(`Cod Comp Removidos: ${codCompSeleccionado} (${etiquetaSeleccionada})`, ['Equipo/EGI', 'Fecha Calculada', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición'], datosFiltrados);
-                        }
-                    }
+                    onClick: generarEventoCilindros(['Equipo/EGI', 'Fecha Calculada', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición'])
                 }
             });
 
@@ -753,7 +750,6 @@
                 }
             });
 
-            // NUEVO: Gráfico de Dispersión (Consumo de Aceite)
             if (charts.scatter) charts.scatter.destroy();
             charts.scatter = new Chart(document.getElementById('scatterChart'), {
                 type: 'scatter',
@@ -763,14 +759,27 @@
                     scales: {
                         x: { 
                             type: 'linear', 
-                            title: { display: true, text: 'Frecuencia' }
+                            title: { display: true, text: 'Frecuencia (Horas)' }
                         },
                         y: { 
                             title: { display: true, text: 'Despachado (Galones)' },
                             beginAtZero: true
                         }
                     },
-                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
+                    plugins: { 
+                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+                        annotation: {
+                            annotations: {
+                                // Líneas Verticales de Horas
+                                lim2000: { type: 'line', xMin: 2000, xMax: 2000, borderColor: '#10b981', borderWidth: 2, borderDash: [5,5], label: { content: '2000 h', display: true, position: 'start', backgroundColor: '#10b981', font: {size: 10} } },
+                                lim2500: { type: 'line', xMin: 2500, xMax: 2500, borderColor: '#f59e0b', borderWidth: 2, borderDash: [5,5], label: { content: '2500 h', display: true, position: 'start', backgroundColor: '#f59e0b', font: {size: 10} } },
+                                lim4000: { type: 'line', xMin: 4000, xMax: 4000, borderColor: '#ef4444', borderWidth: 2, borderDash: [5,5], label: { content: '4000 h', display: true, position: 'start', backgroundColor: '#ef4444', font: {size: 10} } },
+                                
+                                // Línea Horizontal de Galones (Consumo)
+                                limGalones: { type: 'line', yMin: 1060, yMax: 1060, borderColor: '#3b82f6', borderWidth: 2, borderDash: [5,5], label: { content: '1060 Galones', display: true, position: 'end', backgroundColor: '#3b82f6', font: {size: 10} } }
+                            }
+                        }
+                    },
                     onClick: (e, elements, chart) => {
                         if (elements.length > 0) {
                             const datasetIdx = elements[0].datasetIndex;
