@@ -30,7 +30,7 @@
                 </div>
             </div>
             <div id="estadoCarga" class="text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded shadow-sm">
-                Cargando bases de datos...
+                Cargando datos desde Google Sheets...
             </div>
         </div>
 
@@ -92,24 +92,28 @@
             <div class="w-full xl:w-3/4 flex flex-col gap-6">
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Gráfico 1: Cilindros y Bombas -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Cambio de Cilindros y Bombas</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en un Cod Comp (color) para ver detalle</p>
                         <div class="relative w-full h-72"><canvas id="cilindrosChart" class="cursor-pointer"></canvas></div>
                     </div>
 
+                    <!-- Gráfico 2: Códigos ISO -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Códigos ISO</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en un punto para ver análisis del periodo</p>
                         <div class="relative w-full h-72"><canvas id="isoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
+                    <!-- Gráfico 3: Consumo de Aceite -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Consumo de Aceite (N68 / X68)</h3>
-                        <p class="text-[10px] text-gray-400 mb-2">Click en una línea para ver despachos de ese Equipo</p>
+                        <p class="text-[10px] text-gray-400 mb-2">Click en una línea para ver despachos</p>
                         <div class="relative w-full h-72"><canvas id="consumoChart" class="cursor-pointer"></canvas></div>
                     </div>
 
+                    <!-- Gráfico 4: Desgaste -->
                     <div class="border rounded-lg p-4 bg-white shadow-sm">
                         <h3 class="text-md font-bold text-gray-700 mb-1">Revisión de Desgaste promedio (Metales)</h3>
                         <p class="text-[10px] text-gray-400 mb-2">Click en un punto para ver análisis</p>
@@ -117,10 +121,10 @@
                     </div>
                 </div>
 
-                <!-- Gráfico de Dispersión (Consumo de Aceite) con Anotaciones -->
+                <!-- Gráfico de Dispersión ANTES del Boxplot -->
                 <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
-                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite (Relleno vs Cambio)</h3>
-                    <p class="text-[10px] text-gray-400 mb-2">Líneas de referencia según el manual: 1060 Galones a las 2000, 2500 y 4000 horas. Click en un punto para ver detalle.</p>
+                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite (Frecuencia vs Despachado)</h3>
+                    <p class="text-[10px] text-gray-400 mb-2">Evalúa la frecuencia de cambio según manual: Líneas objetivo a 2000, 2500 y 4000 horas (Galones: 1060). Click en un punto para ver detalle.</p>
                     <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
                 </div>
 
@@ -130,6 +134,7 @@
                     <p class="text-[10px] text-gray-400 mb-2">Click en una caja para ver listado de componentes</p>
                     <div class="relative w-full h-80"><canvas id="boxplotChart" class="cursor-pointer"></canvas></div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -174,21 +179,30 @@
         }
 
         window.onload = function() {
+            // ID de la base de datos en Google Sheets
+            const sheetId = '17_4EFKDOHxeK9II4pvr2HNGaCUuDsLpwi0q7cSipHnc';
+            
+            // Asegúrate de que las pestañas en tu Google Sheets se llamen exactamente así:
+            const urlTrakka = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=TRAKKA`;
+            const urlComponentes = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=BD_COMPONENTES_REMOVIDOS`;
+            const urlConsumo = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=CONSUMO_DE_ACEITE`;
+
             Promise.all([
-                fetchCSV('Data_aceites_ANALISIS_DE_ACEITE_TRAKKA.csv'),
-                fetchCSV('Data_aceites_BD_COMPONENTES_REMOVIDOS.csv'),
-                fetchCSV('Data_aceites_CONSUMO_DE_ACEITE.csv')
+                fetchCSV(urlTrakka),
+                fetchCSV(urlComponentes),
+                fetchCSV(urlConsumo)
             ]).then(([trakka, componentes, consumo]) => {
                 dataTrakka = trakka; dataComponentes = componentes; dataConsumo = consumo;
-                document.getElementById('estadoCarga').textContent = "Datos cargados ✓";
+                document.getElementById('estadoCarga').textContent = "Datos cargados de Google Sheets ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-green-600 bg-green-50 p-2 rounded shadow-sm";
                 document.getElementById('filtrosContainer').classList.remove('hidden');
                 document.getElementById('filtrosContainer').classList.add('flex');
                 inicializarFiltros();
                 procesarYDibujarTodo();
             }).catch(err => {
-                document.getElementById('estadoCarga').textContent = "Error cargando datos.";
+                document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa los permisos o los nombres de las hojas.";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-red-600 bg-red-50 p-2 rounded shadow-sm";
+                console.error("Error al cargar desde Google Sheets:", err);
             });
         };
 
@@ -437,7 +451,7 @@
                 statsTrakka[xKey].count++;
             });
 
-            // 2. Componentes
+            // 2. Componentes (Barras y Boxplot)
             const statsComponentesTiempo = {}; 
             const codCompsActivos = new Set();
             const statsBoxplot = {};
@@ -474,9 +488,11 @@
                         codCompsActivos.add(codComp);
                     }
                     
-                    if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
                     const horas = num(d['Horas del Comp. en la posición']);
-                    if (horas > 0) statsBoxplot[codComp].push(horas);
+                    if (horas > 0) {
+                        if (!statsBoxplot[codComp]) statsBoxplot[codComp] = [];
+                        statsBoxplot[codComp].push(horas);
+                    }
                 }
             });
 
@@ -484,11 +500,9 @@
             const labelsPala = sortedPala.map(item => item[0]);
             const dataPala = sortedPala.map(item => item[1]);
 
-            // 3. Consumo y Dispersión
+            // 3. Consumo y Dispersión de Frecuencia
             const statsConsumo = {};
             const equiposConsumoActivos = new Set();
-            
-            // Scatter categorizado por Relleno (<=200) y Cambio (>200)
             const scatterConsumoRelleno = [];
             const scatterConsumoCambio = [];
             
@@ -510,6 +524,7 @@
                 
                 const galones = num(d['Despachado'] || d['Valor']);
                 const frecuencia = num(d['Frecuencia']); 
+                const tipoConsumo = (d['Tipo'] || '').trim().toUpperCase();
 
                 if (!statsConsumo[xKey]) statsConsumo[xKey] = {};
                 if (!statsConsumo[xKey][eqConsumo]) statsConsumo[xKey][eqConsumo] = 0;
@@ -517,9 +532,9 @@
                 equiposConsumoActivos.add(eqConsumo);
 
                 if (galones > 0) {
-                    if (galones <= 200) {
+                    if (tipoConsumo === 'RELLENO') {
                         scatterConsumoRelleno.push({ x: frecuencia, y: galones, raw: d });
-                    } else {
+                    } else if (tipoConsumo === 'CAMBIO' || tipoConsumo === 'CAMBIO DE ACEITE') {
                         scatterConsumoCambio.push({ x: frecuencia, y: galones, raw: d });
                     }
                 }
@@ -543,7 +558,6 @@
                 }
             });
 
-            // DATASETS CILINDROS
             const cilindrosDatasets = [];
             let colorIdx = 0;
             Array.from(codCompsActivos).sort().forEach(cod => {
@@ -558,7 +572,6 @@
                 colorIdx++;
             });
 
-            // DATASETS CONSUMO (LÍNEAS)
             const consumoDatasets = [];
             let colorIdxConsumo = 0;
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
@@ -577,20 +590,19 @@
                 colorIdxConsumo++;
             });
 
-            // SCATTER DATASETS (Relleno y Cambio)
             const scatterDatasets = [
                 {
-                    label: 'Relleno (<= 200 gal)',
+                    label: 'Relleno',
                     data: scatterConsumoRelleno,
-                    backgroundColor: '#60a5fa', // Azul claro
+                    backgroundColor: '#60a5fa', 
                     borderColor: '#3b82f6',
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    pointRadius: 5,
+                    pointHoverRadius: 7
                 },
                 {
-                    label: 'Cambio de Aceite (> 200 gal)',
+                    label: 'Cambio de Aceite',
                     data: scatterConsumoCambio,
-                    backgroundColor: '#1e3a8a', // Azul oscuro
+                    backgroundColor: '#1e3a8a', 
                     borderColor: '#1e3a8a',
                     pointRadius: 6,
                     pointHoverRadius: 8
@@ -723,40 +735,6 @@
                 }
             });
 
-            if (charts.boxplot) charts.boxplot.destroy();
-            charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
-                type: 'boxplot',
-                data: { labels: labelsBoxplot, datasets: [
-                    { label: 'Horas del Componente', data: dataBoxplot, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: '#2563eb', borderWidth: 1, outlierColor: '#ef4444' }
-                ]}, 
-                options: {
-                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-                    scales: { x: { title: { display: true, text: 'Cod Comp' }, ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 } }, y: { title: { display: true, text: 'Horas en la posición' } } },
-                    onClick: (e, elements, chart) => {
-                        if (elements.length > 0) {
-                            const codCompSeleccionado = chart.data.labels[elements[0].index];
-                            const yrFilter = getYearsSeleccionados();
-                            const eqFilter = getEquiposSeleccionados();
-                            
-                            const datosFiltrados = dataComponentes.filter(d => {
-                                if ((d['Cod Comp'] || '').trim() !== codCompSeleccionado) return false;
-                                const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
-                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
-                                
-                                const flotaSel = document.getElementById('flotaFilter').value;
-                                if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
-                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
-                                
-                                const codexSel = document.getElementById('codexFilter').value;
-                                if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
-                                return true;
-                            });
-                            abrirModalDatos(`Listado de Horas para Cod Comp: ${codCompSeleccionado}`, ['Equipo/EGI', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición', 'Fecha Calculada'], datosFiltrados);
-                        }
-                    }
-                }
-            });
-
             if (charts.scatter) charts.scatter.destroy();
             charts.scatter = new Chart(document.getElementById('scatterChart'), {
                 type: 'scatter',
@@ -787,7 +765,7 @@
                             callbacks: {
                                 label: function(context) {
                                     const rawData = context.raw.raw;
-                                    return `Eq: ${rawData['Equipo']} | Frec: ${context.parsed.x} | Gal: ${context.parsed.y}`;
+                                    return `Eq: ${rawData['Equipo']} | Frec: ${context.parsed.x} | Gal: ${context.parsed.y} | Tipo: ${rawData['Tipo']}`;
                                 }
                             }
                         }
@@ -803,9 +781,43 @@
                             
                             abrirModalDatos(
                                 `Detalle de Evento (${categoria})`, 
-                                ['Equipo', 'Fecha Calculada', 'Despachado', 'Frecuencia', 'Item Desc'], 
+                                ['Equipo', 'Fecha Calculada', 'Despachado', 'Frecuencia', 'Item Desc', 'Tipo'], 
                                 [filaExacta]
                             );
+                        }
+                    }
+                }
+            });
+
+            if (charts.boxplot) charts.boxplot.destroy();
+            charts.boxplot = new Chart(document.getElementById('boxplotChart'), {
+                type: 'boxplot',
+                data: { labels: labelsBoxplot, datasets: [
+                    { label: 'Horas del Componente', data: dataBoxplot, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: '#2563eb', borderWidth: 1, outlierColor: '#ef4444' }
+                ]}, 
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { title: { display: true, text: 'Cod Comp' }, ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 } }, y: { title: { display: true, text: 'Horas en la posición' } } },
+                    onClick: (e, elements, chart) => {
+                        if (elements.length > 0) {
+                            const codCompSeleccionado = chart.data.labels[elements[0].index];
+                            const yrFilter = getYearsSeleccionados();
+                            const eqFilter = getEquiposSeleccionados();
+                            
+                            const datosFiltrados = dataComponentes.filter(d => {
+                                if ((d['Cod Comp'] || '').trim() !== codCompSeleccionado) return false;
+                                const parsedDate = parseFecha(d['Fecha Calculada'] || d['Fecha']);
+                                if (!yrFilter.esTodos && !yrFilter.valores.includes(parsedDate?.año)) return false;
+                                
+                                const flotaSel = document.getElementById('flotaFilter').value;
+                                if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return false;
+                                if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo']) && !eqFilter.valores.includes(d['Equipo/EGI'])) return false;
+                                
+                                const codexSel = document.getElementById('codexFilter').value;
+                                if (codexSel !== 'Todos' && d['Codex'] !== codexSel) return false;
+                                return true;
+                            });
+                            abrirModalDatos(`Listado de Horas para Cod Comp: ${codCompSeleccionado}`, ['Equipo/EGI', 'Tipo De Componente', 'Cod Comp', 'Horas del Comp. en la posición', 'Fecha Calculada'], datosFiltrados);
                         }
                     }
                 }
