@@ -121,11 +121,21 @@
                     </div>
                 </div>
 
-                <!-- Gráfico de Dispersión ANTES del Boxplot -->
-                <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
-                    <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo de Aceite (Frecuencia vs Despachado)</h3>
-                    <p class="text-[10px] text-gray-400 mb-2">Evalúa la frecuencia de cambio según manual: Líneas objetivo a 2000, 2500 y 4000 horas (Galones: 1060). Click en un punto para ver detalle.</p>
-                    <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
+                <!-- Grid de 2 Columnas para Scatter y Nuevo Gráfico JOAP -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Gráfico de Dispersión (Consumo de Aceite) -->
+                    <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-blue-600">
+                        <h3 class="text-md font-bold text-gray-700 mb-1">Dispersión de Consumo (Frecuencia vs Despachado)</h3>
+                        <p class="text-[10px] text-gray-400 mb-2">Evalúa la frecuencia de cambio según manual. Click en un punto para detalle.</p>
+                        <div class="relative w-full h-80"><canvas id="scatterChart" class="cursor-pointer"></canvas></div>
+                    </div>
+
+                    <!-- NUEVO: Gráfico de Condición del Aceite (JOAP) -->
+                    <div class="border rounded-lg p-4 bg-white shadow-sm w-full border-l-4 border-l-purple-600">
+                        <h3 class="text-md font-bold text-gray-700 mb-1">Condición del Aceite (JOAP)</h3>
+                        <p class="text-[10px] text-gray-400 mb-2">Promedios de Nitración, Oxidación y Sulfatación. Click para detalle.</p>
+                        <div class="relative w-full h-80"><canvas id="condicionChart" class="cursor-pointer"></canvas></div>
+                    </div>
                 </div>
 
                 <!-- Boxplot -->
@@ -160,7 +170,7 @@
 
     <script>
         let dataTrakka = [], dataComponentes = [], dataConsumo = [];
-        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null, pala: null, scatter: null };
+        let charts = { desgaste: null, iso: null, consumo: null, cilindros: null, boxplot: null, pala: null, scatter: null, condicion: null };
 
         const coloresComponentes = [
             '#1e3a8a', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
@@ -179,10 +189,7 @@
         }
 
         window.onload = function() {
-            // ID de la base de datos en Google Sheets
             const sheetId = '17_4EFKDOHxeK9II4pvr2HNGaCUuDsLpwi0q7cSipHnc';
-            
-            // Asegúrate de que las pestañas en tu Google Sheets se llamen exactamente así:
             const urlTrakka = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=TRAKKA`;
             const urlComponentes = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=BD_COMPONENTES_REMOVIDOS`;
             const urlConsumo = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=CONSUMO_DE_ACEITE`;
@@ -437,7 +444,9 @@
                 
                 const xKey = getXKey(d['Fecha Calculada'], dimTiempo);
                 if (!xKey) return;
-                if (!statsTrakka[xKey]) statsTrakka[xKey] = { h:0, c:0, p:0, cr:0, a:0, si:0, iso4:0, iso6:0, iso14:0, count:0 };
+                
+                // Agregadas columnas de Nitración, Oxidación y Sulfatación
+                if (!statsTrakka[xKey]) statsTrakka[xKey] = { h:0, c:0, p:0, cr:0, a:0, si:0, iso4:0, iso6:0, iso14:0, ni:0, ox:0, su:0, count:0 };
                 
                 statsTrakka[xKey].h += num(d['Hierro (ppm)']);
                 statsTrakka[xKey].c += num(d['Cobre (ppm)']);
@@ -448,6 +457,9 @@
                 statsTrakka[xKey].iso4 += num(d['ISO 4406:1999 > 04µ']);
                 statsTrakka[xKey].iso6 += num(d['ISO 4406:1999 > 06µ']);
                 statsTrakka[xKey].iso14 += num(d['ISO 4406:1999 > 14µ']);
+                statsTrakka[xKey].ni += num(d['Nitración JOAP (Abs/cm)']);
+                statsTrakka[xKey].ox += num(d['Oxidación JOAP (Abs/cm)']);
+                statsTrakka[xKey].su += num(d['Sulfatación JOAP (Abs/cm)']);
                 statsTrakka[xKey].count++;
             });
 
@@ -515,6 +527,7 @@
                 if (flotaSel !== 'Todas' && d['Flota'] !== flotaSel) return;
                 if (!eqFilter.esTodos && !eqFilter.valores.includes(d['Equipo'])) return;
                 
+                // Filtro exclusivo N68 y X68
                 const itemDesc = (d['Item Desc'] || '').trim().toUpperCase();
                 if (itemDesc !== 'N68' && itemDesc !== 'X68' && itemDesc !== 'EX68') return;
                 
@@ -545,6 +558,7 @@
 
             const dHierro = [], dCobre = [], dSilicio = [], dAlum = [];
             const dIso4 = [], dIso6 = [], dIso14 = [];
+            const dNitra = [], dOxida = [], dSulfa = [];
 
             labelsTiempo.forEach(l => {
                 const tk = statsTrakka[l];
@@ -552,12 +566,15 @@
                     dHierro.push(tk.h / tk.count); dCobre.push(tk.c / tk.count); 
                     dAlum.push(tk.a / tk.count); dSilicio.push(tk.si / tk.count);
                     dIso4.push(tk.iso4 / tk.count); dIso6.push(tk.iso6 / tk.count); dIso14.push(tk.iso14 / tk.count);
+                    dNitra.push(tk.ni / tk.count); dOxida.push(tk.ox / tk.count); dSulfa.push(tk.su / tk.count);
                 } else {
                     dHierro.push(0); dCobre.push(0); dAlum.push(0); dSilicio.push(0);
                     dIso4.push(0); dIso6.push(0); dIso14.push(0);
+                    dNitra.push(0); dOxida.push(0); dSulfa.push(0);
                 }
             });
 
+            // DATASETS CILINDROS
             const cilindrosDatasets = [];
             let colorIdx = 0;
             Array.from(codCompsActivos).sort().forEach(cod => {
@@ -572,6 +589,7 @@
                 colorIdx++;
             });
 
+            // DATASETS CONSUMO (LÍNEAS)
             const consumoDatasets = [];
             let colorIdxConsumo = 0;
             Array.from(equiposConsumoActivos).sort().forEach(eq => {
@@ -590,6 +608,7 @@
                 colorIdxConsumo++;
             });
 
+            // DATASETS SCATTER
             const scatterDatasets = [
                 {
                     label: 'Relleno',
@@ -614,11 +633,12 @@
 
             dibujarGraficos(
                 labelsTiempo, {dHierro, dCobre, dAlum, dSilicio}, {dIso4, dIso6, dIso14}, 
-                cilindrosDatasets, consumoDatasets, scatterDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala
+                cilindrosDatasets, consumoDatasets, scatterDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala,
+                {dNitra, dOxida, dSulfa}
             );
         }
 
-        function dibujarGraficos(labelsTiempo, tk, iso, cilindrosDatasets, consumoDatasets, scatterDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala) {
+        function dibujarGraficos(labelsTiempo, tk, iso, cilindrosDatasets, consumoDatasets, scatterDatasets, labelsBoxplot, dataBoxplot, labelsPala, dataPala, cond) {
             
             if (charts.pala) charts.pala.destroy();
             charts.pala = new Chart(document.getElementById('palaChart'), {
@@ -752,7 +772,7 @@
                         }
                     },
                     plugins: { 
-                        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+                        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
                         annotation: {
                             annotations: {
                                 lim2000: { type: 'line', xMin: 2000, xMax: 2000, borderColor: '#10b981', borderWidth: 2, borderDash: [5,5], label: { content: '2000 h', display: true, position: 'start', backgroundColor: '#10b981', font: {size: 10} } },
@@ -786,6 +806,21 @@
                             );
                         }
                     }
+                }
+            });
+
+            // NUEVO: Gráfico de Condición del Aceite (JOAP)
+            if (charts.condicion) charts.condicion.destroy();
+            charts.condicion = new Chart(document.getElementById('condicionChart'), {
+                type: 'line',
+                data: { labels: labelsTiempo, datasets: [
+                    { label: 'Nitración', data: cond.dNitra, borderColor: '#8b5cf6', tension: 0.2 },
+                    { label: 'Oxidación', data: cond.dOxida, borderColor: '#ec4899', tension: 0.2 },
+                    { label: 'Sulfatación', data: cond.dSulfa, borderColor: '#14b8a6', tension: 0.2 }
+                ]},
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    onClick: generarEventoTiempo('Trakka', ['Equipo', 'Fecha Calculada', 'Nitración JOAP (Abs/cm)', 'Oxidación JOAP (Abs/cm)', 'Sulfatación JOAP (Abs/cm)'], 'Condición del Aceite')
                 }
             });
 
